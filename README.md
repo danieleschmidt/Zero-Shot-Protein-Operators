@@ -35,33 +35,88 @@ Zero-Shot Protein-Operators enables the design of novel proteins by treating fol
 ### Prerequisites
 
 - Python 3.10+
-- CUDA 11.8+
+- CUDA 11.8+ (optional, for GPU acceleration)
 - PyTorch 2.0+
 - JAX 0.4+ (for PDE solvers)
 - OpenMM 8.0+ (for MD simulations)
 
 ### Quick Install
 
+**Option 1: Automated Setup (Recommended)**
 ```bash
-git clone https://github.com/yourusername/Zero-Shot-Protein-Operators
+git clone https://github.com/danieleschmidt/Zero-Shot-Protein-Operators
+cd Zero-Shot-Protein-Operators
+
+# Run automated setup script
+python scripts/setup.py
+```
+
+**Option 2: Manual Setup**
+```bash
+# Clone repository
+git clone https://github.com/danieleschmidt/Zero-Shot-Protein-Operators
 cd Zero-Shot-Protein-Operators
 
 # Create conda environment
 conda env create -f environment.yml
 conda activate protein-operators
 
-# Install package
-pip install -e .
+# Install package in development mode
+pip install -e ".[dev,experiments]"
 
-# Download pre-trained operators
-python scripts/download_models.py
+# Set up pre-commit hooks (optional)
+pre-commit install
+
+# Verify installation
+python -c "import protein_operators; print('✅ Installation successful!')"
 ```
 
 ### Docker Setup
 
+**Development Environment**
 ```bash
-docker pull ghcr.io/yourusername/protein-operators:latest
-docker run --gpus all -it protein-operators:latest
+# Build and run development container
+docker-compose up dev
+
+# Access Jupyter Lab at http://localhost:8888
+# Access MLflow at http://localhost:5000
+```
+
+**Production Deployment**
+```bash
+# Build production image
+docker build --target production -t protein-operators:latest .
+
+# Run API server
+docker run --gpus all -p 8000:8000 protein-operators:latest
+```
+
+**GPU Testing**
+```bash
+# Test GPU availability
+docker-compose run gpu-test
+```
+
+### Installation Verification
+
+```bash
+# Activate environment
+conda activate protein-operators
+
+# Run basic tests
+pytest tests/test_core.py -v
+
+# Check GPU availability
+python -c "
+import torch
+print(f'PyTorch: {torch.__version__}')
+print(f'CUDA available: {torch.cuda.is_available()}')
+if torch.cuda.is_available():
+    print(f'GPU: {torch.cuda.get_device_name(0)}')
+"
+
+# Test CLI
+protein-operators --help
 ```
 
 ## Quick Start

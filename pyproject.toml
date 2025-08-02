@@ -1,0 +1,187 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "protein-operators"
+version = "0.1.0"
+description = "Zero-shot protein design via PDE-constrained neural operators"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Protein Operators Team", email = "contact@protein-operators.org"}
+]
+keywords = ["protein-design", "neural-operators", "computational-biology", "machine-learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.10"
+dependencies = [
+    # Core ML frameworks
+    "torch>=2.0.0",
+    "torchvision",
+    "jax[cuda12]>=0.4.0",
+    "jaxlib",
+    "flax",
+    "optax",
+    
+    # Scientific computing
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.3.0",
+    
+    # Protein/molecular tools
+    "biopython>=1.81",
+    "mdtraj>=1.9.7",
+    "openmm>=8.0.0",
+    "pymol-open-source",
+    
+    # Visualization and analysis
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "plotly>=5.14.0",
+    "py3Dmol>=2.0.0",
+    
+    # Configuration and utilities
+    "hydra-core>=1.3.0",
+    "omegaconf>=2.3.0",
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+    "pydantic>=2.0.0",
+    
+    # Data handling
+    "h5py>=3.8.0",
+    "zarr>=2.14.0",
+    "datasets>=2.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.3.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.2.0",
+    "black>=23.3.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.3.0",
+    "pre-commit>=3.3.0",
+]
+experiments = [
+    "jupyter>=1.0.0",
+    "ipywidgets>=8.0.0",
+    "mlflow>=2.3.0",
+    "wandb>=0.15.0",
+    "tensorboard>=2.13.0",
+    "dvc[s3]>=3.0.0",
+]
+docs = [
+    "sphinx>=6.2.0",
+    "sphinx-rtd-theme>=1.2.0",
+    "myst-parser>=1.0.0",
+    "sphinx-autodoc-typehints>=1.23.0",
+]
+all = ["protein-operators[dev,experiments,docs]"]
+
+[project.urls]
+Homepage = "https://github.com/danieleschmidt/Zero-Shot-Protein-Operators"
+Documentation = "https://protein-operators.readthedocs.io"
+Repository = "https://github.com/danieleschmidt/Zero-Shot-Protein-Operators"
+Issues = "https://github.com/danieleschmidt/Zero-Shot-Protein-Operators/issues"
+
+[project.scripts]
+protein-operators = "protein_operators.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+protein_operators = ["data/*", "models/*", "configs/*"]
+
+# Development tools configuration
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["protein_operators"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "openmm.*",
+    "mdtraj.*",
+    "pymol.*",
+    "py3Dmol.*",
+    "wandb.*",
+    "mlflow.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-ra -q --cov=protein_operators --cov-report=term-missing"
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src/protein_operators"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
