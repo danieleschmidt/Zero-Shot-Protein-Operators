@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Development environment with Jupyter
+  dev:
+    build:
+      context: .
+      target: development
+    container_name: protein-operators-dev
+    volumes:
+      - .:/workspace
+      - ~/.ssh:/home/root/.ssh:ro  # For git access
+      - protein-data:/workspace/data
+      - protein-models:/workspace/models
+    ports:
+      - "8888:8888"  # Jupyter Lab
+      - "6006:6006"  # TensorBoard
+      - "5000:5000"  # MLflow
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - protein-net
+
+  # MLflow tracking server
+  mlflow:
+    image: python:3.11-slim
+    container_name: protein-operators-mlflow
+    command: >
+      bash -c "pip install mlflow[extras]==2.3.0 &&
+               mlflow server --host 0.0.0.0 --port 5000 
+               --default-artifact-root /mlflow/artifacts 
+               --backend-store-uri sqlite:///mlflow/store.db"
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "5000:5000"
+    networks:
+      - protein-net
+
+  # Production API server
+  api:
+    build:
+      context: .
+      target: production
+    container_name: protein-operators-api
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: ["uvicorn", "protein_operators.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    networks:
+      - protein-net
+
+  # GPU validation service
+  gpu-test:
+    build:
+      context: .
+      target: gpu-test
+    container_name: protein-operators-gpu-test
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - protein-net
+
+volumes:
+  protein-data:
+    driver: local
+  protein-models:
+    driver: local
+  mlflow-data:
+    driver: local
+
+networks:
+  protein-net:
+    driver: bridge
