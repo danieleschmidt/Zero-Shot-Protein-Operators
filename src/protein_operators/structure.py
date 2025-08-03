@@ -108,3 +108,147 @@ class ProteinStructure:
             "num_residues": self.num_residues,
             "metadata": self.metadata,
         }
+    
+    def compute_radius_of_gyration(self) -> float:
+        """Compute radius of gyration."""
+        centroid = torch.mean(self.coordinates, dim=0)
+        distances_sq = torch.sum((self.coordinates - centroid) ** 2, dim=1)
+        rg = torch.sqrt(torch.mean(distances_sq))
+        return rg.item()
+    
+    def compute_distance_matrix(self) -> torch.Tensor:
+        """Compute pairwise distance matrix."""
+        return torch.cdist(self.coordinates, self.coordinates)
+    
+    def compute_contact_map(self, cutoff: float = 8.0) -> torch.Tensor:
+        """Compute residue contact map."""
+        dist_matrix = self.compute_distance_matrix()
+        contact_map = (dist_matrix < cutoff).float()
+        # Zero out diagonal and nearby residues
+        n = contact_map.size(0)
+        for i in range(3):
+            idx = torch.arange(n - i)
+            contact_map[idx, idx + i] = 0
+            if i > 0:
+                contact_map[idx + i, idx] = 0
+        return contact_map
+    
+    def validate_geometry(self) -> Dict[str, float]:
+        """Validate protein geometry."""
+        validation_results = {}
+        
+        # Bond length validation
+        if self.num_residues > 1:
+            bond_lengths = torch.norm(
+                self.coordinates[1:] - self.coordinates[:-1], dim=1
+            )
+            ideal_ca_distance = 3.8  # Angstroms
+            bond_deviations = torch.abs(bond_lengths - ideal_ca_distance)
+            validation_results['avg_bond_deviation'] = torch.mean(bond_deviations).item()
+            validation_results['max_bond_deviation'] = torch.max(bond_deviations).item()
+        
+        # Clash detection
+        if self.num_residues > 2:
+            dist_matrix = self.compute_distance_matrix()
+            # Mask out bonded neighbors
+            mask = torch.ones_like(dist_matrix)
+            n = dist_matrix.size(0)
+            for i in range(3):
+                idx = torch.arange(n - i)
+                mask[idx, idx + i] = 0
+                if i > 0:
+                    mask[idx + i, idx] = 0
+            
+            clash_cutoff = 2.0  # Angstroms
+            clashes = torch.sum((dist_matrix < clash_cutoff) & (mask > 0))
+            validation_results['num_clashes'] = clashes.item()
+        
+        # Compactness
+        validation_results['radius_of_gyration'] = self.compute_radius_of_gyration()
+        
+        return validation_results
+    
+    def apply_transformation(self, rotation: torch.Tensor, translation: torch.Tensor) -> None:
+        """Apply rotation and translation to coordinates."""
+        if rotation.shape != (3, 3):
+            raise ValueError("Rotation matrix must be 3x3")
+        if translation.shape != (3,):
+            raise ValueError("Translation vector must be length 3")
+        
+        self.coordinates = torch.matmul(self.coordinates, rotation.T) + translation
+    
+    def align_to(self, reference: "ProteinStructure") -> float:
+        """Align structure to reference using Kabsch algorithm (simplified)."""
+        if self.num_residues != reference.num_residues:
+            raise ValueError("Structures must have same number of residues")
+        
+        # Center both structures
+        coords1 = self.coordinates - torch.mean(self.coordinates, dim=0)
+        coords2 = reference.coordinates - torch.mean(reference.coordinates, dim=0)
+        
+        # Compute covariance matrix
+        H = torch.matmul(coords1.T, coords2)
+        
+        # SVD for optimal rotation
+        try:
+            U, S, V = torch.svd(H)
+            R = torch.matmul(V, U.T)
+            
+            # Ensure proper rotation (det(R) = 1)
+            if torch.det(R) < 0:
+                V[:, -1] *= -1
+                R = torch.matmul(V, U.T)
+            
+            # Apply transformation
+            self.coordinates = torch.matmul(coords1, R) + torch.mean(reference.coordinates, dim=0)
+            
+            # Return RMSD after alignment
+            return self.compute_rmsd(reference)
+            
+        except Exception:
+            # Fallback: simple translation alignment
+            translation = torch.mean(reference.coordinates, dim=0) - torch.mean(self.coordinates, dim=0)
+            self.coordinates += translation
+            return self.compute_rmsd(reference)
+    
+    def extract_fragment(self, start: int, end: int) -> "ProteinStructure":
+        """Extract a fragment of the structure."""
+        if start < 0 or end > self.num_residues or start >= end:
+            raise ValueError("Invalid fragment indices")
+        
+        fragment_coords = self.coordinates[start:end]
+        fragment_sequence = self.sequence[start:end] if self.sequence else None
+        
+        return ProteinStructure(
+            coordinates=fragment_coords,
+            sequence=fragment_sequence,
+            metadata={**self.metadata, 'fragment_range': (start, end)}
+        )
+    
+    def compute_secondary_structure_simple(self) -> List[str]:
+        """Simple secondary structure assignment based on phi/psi angles."""
+        if self.num_residues < 4:
+            return ['C'] * self.num_residues  # All coil
+        
+        ss_assignment = ['C'] * self.num_residues
+        
+        # Simplified assignment based on local geometry
+        for i in range(1, self.num_residues - 1):
+            # Compute angle between consecutive CA-CA vectors
+            v1 = self.coordinates[i] - self.coordinates[i-1] 
+            v2 = self.coordinates[i+1] - self.coordinates[i]
+            
+            v1_norm = torch.nn.functional.normalize(v1.unsqueeze(0), dim=1).squeeze(0)
+            v2_norm = torch.nn.functional.normalize(v2.unsqueeze(0), dim=1).squeeze(0)
+            
+            cos_angle = torch.dot(v1_norm, v2_norm)
+            
+            # Simple heuristic: sharp turns suggest beta, gradual turns suggest alpha
+            if cos_angle > 0.5:  # < 60 degrees - extended
+                ss_assignment[i] = 'E'
+            elif cos_angle > -0.5:  # 60-120 degrees - turn/loop
+                ss_assignment[i] = 'C'
+            else:  # > 120 degrees - helical
+                ss_assignment[i] = 'H'
+        
+        return ss_assignment

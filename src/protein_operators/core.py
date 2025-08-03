@@ -10,6 +10,7 @@ from pathlib import Path
 from .models import ProteinDeepONet, ProteinFNO
 from .constraints import Constraints
 from .pde import FoldingPDE
+import torch.nn.functional as F
 
 
 class ProteinDesigner:
