@@ -330,5 +330,43 @@ class Constraints:
     def __iter__(self):
         return iter(self.constraints)
     
+    # Convenience methods for common constraint types
+    @property
+    def binding_sites(self):
+        """Get binding site constraints (for backward compatibility)."""
+        from .functional import BindingSiteConstraint
+        return [c for c in self.constraints if isinstance(c, BindingSiteConstraint)]
+    
+    @property 
+    def secondary_structure(self):
+        """Get secondary structure constraints (for backward compatibility)."""
+        from .structural import SecondaryStructureConstraint
+        return [c for c in self.constraints if isinstance(c, SecondaryStructureConstraint)]
+    
+    def add_binding_site(self, residues, ligand, affinity_nm=None, **kwargs):
+        """Add a binding site constraint."""
+        from .functional import BindingSiteConstraint
+        constraint = BindingSiteConstraint(
+            name=f"binding_site_{len(self.binding_sites) + 1}",
+            residues=residues,
+            ligand=ligand,
+            affinity_nm=affinity_nm,
+            **kwargs
+        )
+        self.add_constraint(constraint)
+    
+    def add_secondary_structure(self, start, end, ss_type, confidence=1.0, **kwargs):
+        """Add a secondary structure constraint."""
+        from .structural import SecondaryStructureConstraint
+        constraint = SecondaryStructureConstraint(
+            name=f"ss_{ss_type}_{start}_{end}",
+            start=start,
+            end=end,
+            ss_type=ss_type,
+            confidence=confidence,
+            **kwargs
+        )
+        self.add_constraint(constraint)
+        
     def __repr__(self) -> str:
         return f"Constraints({len(self.constraints)} constraints)"
