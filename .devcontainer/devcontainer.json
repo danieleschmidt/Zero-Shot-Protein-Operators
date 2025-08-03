@@ -1,0 +1,102 @@
+{
+  "name": "Zero-Shot Protein-Operators Development",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-bullseye",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/cuda:1": {
+      "installToolkit": true,
+      "installCudnn": true
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "ms-toolsai.jupyter",
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools",
+        "github.copilot",
+        "github.copilot-chat",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-python.mypy-type-checker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/conda/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black",
+        "python.formatting.blackArgs": ["--line-length=88"],
+        "python.sortImports.args": ["--profile", "black"],
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestArgs": ["tests"],
+        "files.associations": {
+          "*.pdb": "plaintext",
+          "*.xyz": "plaintext",
+          "*.gro": "plaintext"
+        },
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": true
+        },
+        "jupyter.askForKernelRestart": false,
+        "jupyter.runStartupCommands": [
+          "%load_ext autoreload",
+          "%autoreload 2"
+        ]
+      }
+    }
+  },
+  
+  "forwardPorts": [8888, 8000, 5000, 6006],
+  "portsAttributes": {
+    "8888": {
+      "label": "Jupyter Lab",
+      "onAutoForward": "notify"
+    },
+    "8000": {
+      "label": "API Server",
+      "onAutoForward": "notify"
+    },
+    "5000": {
+      "label": "MLflow UI",
+      "onAutoForward": "notify"
+    },
+    "6006": {
+      "label": "TensorBoard",
+      "onAutoForward": "notify"
+    }
+  },
+  
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  
+  "remoteEnv": {
+    "PYTHONPATH": "/workspaces/Zero-Shot-Protein-Operators/src",
+    "CUDA_VISIBLE_DEVICES": "0",
+    "OPENMM_PLUGIN_DIR": "/opt/conda/lib/plugins",
+    "PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION": "python"
+  },
+  
+  "mounts": [
+    "source=${localWorkspaceFolder}/.devcontainer/cache,target=/opt/conda/pkgs,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/data,target=/workspaces/data,type=bind,consistency=cached"
+  ],
+  
+  "runArgs": [
+    "--gpus=all",
+    "--shm-size=2g"
+  ],
+  
+  "workspaceFolder": "/workspaces/Zero-Shot-Protein-Operators",
+  
+  "shutdownAction": "stopContainer"
+}

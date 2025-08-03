@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Tuple
 import torch
 import torch.nn as nn
+import numpy as np
 
 
 class BaseNeuralOperator(nn.Module, ABC):
@@ -120,10 +121,38 @@ class BaseNeuralOperator(nn.Module, ABC):
         Returns:
             Physics loss tensor
         """
-        # TODO: Implement physics loss computation
-        # This would involve checking energy conservation,
-        # force consistency, etc.
-        return torch.tensor(0.0, device=output.device)
+        # Implement basic physics consistency checks
+        physics_loss = torch.tensor(0.0, device=output.device)
+        
+        # Bond length consistency
+        if output.shape[1] > 1:
+            bond_lengths = torch.norm(output[:, 1:] - output[:, :-1], dim=-1)
+            ideal_length = 1.5  # Angstroms (C-C bond)
+            bond_loss = torch.mean((bond_lengths - ideal_length)**2)
+            physics_loss += bond_loss
+        
+        # Prevent atomic clashes
+        if output.shape[1] > 2:
+            # Pairwise distances
+            coords_i = output.unsqueeze(2)  # [batch, length, 1, 3]
+            coords_j = output.unsqueeze(1)  # [batch, 1, length, 3]
+            distances = torch.norm(coords_i - coords_j, dim=-1)  # [batch, length, length]
+            
+            # Mask out bonded neighbors
+            length = output.shape[1]
+            mask = torch.ones_like(distances)
+            for i in range(2):
+                idx = torch.arange(length - i - 1)
+                mask[:, idx, idx + i + 1] = 0
+                mask[:, idx + i + 1, idx] = 0
+            
+            # Clash penalty for distances < van der Waals radius
+            min_distance = 2.0  # Angstroms
+            clash_penalty = torch.relu(min_distance - distances)
+            clash_loss = torch.sum(clash_penalty * mask, dim=(1, 2))
+            physics_loss += torch.mean(clash_loss)
+        
+        return physics_loss
     
     def get_model_info(self) -> Dict[str, Any]:
         """Get model information and statistics."""

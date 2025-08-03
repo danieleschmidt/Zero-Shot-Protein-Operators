@@ -1,0 +1,70 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# All files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Python files
+[*.py]
+indent_size = 4
+max_line_length = 88
+
+# JavaScript/TypeScript files
+[*.{js,ts,jsx,tsx}]
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_size = 2
+
+# YAML files
+[*.{yml,yaml}]
+indent_size = 2
+
+# TOML files
+[*.toml]
+indent_size = 2
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+
+# Jupyter notebooks
+[*.ipynb]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+# Configuration files
+[{.env,.env.*}]
+insert_final_newline = true
+
+# Shell scripts
+[*.{sh,bash}]
+indent_size = 2
+
+# Docker files
+[{Dockerfile,Dockerfile.*}]
+indent_size = 2
+
+# PDB files
+[*.pdb]
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# Data files
+[*.{csv,tsv,dat}]
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# Binary files
+[*.{png,jpg,jpeg,gif,ico,pdf,zip,tar,gz}]
+insert_final_newline = false
+trim_trailing_whitespace = false
