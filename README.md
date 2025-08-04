@@ -657,7 +657,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 ```bibtex
 @article{protein-neural-operators-2025,
   title={Zero-Shot Protein Design via PDE-Constrained Neural Operators},
-  author={Your Name},
+  author={Daniel Schmidt},
   journal={bioRxiv},
   year={2025},
   doi={10.1101/2025.05.XXXXX}
