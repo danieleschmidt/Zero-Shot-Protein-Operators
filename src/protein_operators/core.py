@@ -121,49 +121,125 @@ class ProteinDesigner:
             ValueError: If constraints are invalid
             RuntimeError: If generation fails
         """
-        # TODO: Implement constraint validation
+        # Validate input constraints
         self._validate_constraints(constraints, length)
         
-        # TODO: Implement neural operator inference
+        # Generate protein structure using neural operator
         with torch.no_grad():
-            # Encode constraints
+            # Encode constraints into neural operator format
             constraint_encoding = self._encode_constraints(constraints)
             
-            # Generate spatial coordinates
+            # Generate 3D coordinates using neural operator model
             coordinates = self._generate_coordinates(
                 constraint_encoding, length, num_samples
             )
             
-            # Optional physics-guided refinement
+            # Apply physics-guided refinement if requested
             if physics_guided and self.pde is not None:
                 coordinates = self._refine_with_physics(coordinates)
         
-        # TODO: Create ProteinStructure object
+        # Create final protein structure object
         structure = self._create_structure(coordinates, constraints)
         
         self.design_count += 1
         return structure
     
     def _validate_constraints(self, constraints: Constraints, length: int) -> None:
-        """Validate input constraints."""
+        """Validate input constraints comprehensively."""
+        # Basic length validation
         if length <= 0:
             raise ValueError("Protein length must be positive")
-        if length > 1000:
-            raise ValueError("Protein length exceeds maximum supported size (1000)")
+        if length > 2000:  # Increased from 1000 for larger proteins
+            raise ValueError("Protein length exceeds maximum supported size (2000)")
+        if length < 10:
+            raise ValueError("Protein length too short (minimum 10 residues)")
             
-        # Validate binding sites don't exceed protein length
-        for binding_site in constraints.binding_sites:
-            if any(res > length for res in binding_site.residues):
-                raise ValueError(f"Binding site residue indices exceed protein length {length}")
-                
+        # Validate binding site constraints
+        occupied_residues = set()
+        for i, binding_site in enumerate(constraints.binding_sites):
+            # Check residue indices are valid
+            if any(res < 1 or res > length for res in binding_site.residues):
+                raise ValueError(f"Binding site {i+1}: residue indices must be between 1 and {length}")
+            
+            # Check for overlapping binding sites
+            binding_set = set(binding_site.residues)
+            if occupied_residues & binding_set:
+                overlapping = occupied_residues & binding_set
+                raise ValueError(f"Binding site {i+1}: residues {overlapping} already used by another binding site")
+            occupied_residues.update(binding_set)
+            
+            # Validate binding site parameters
+            binding_site.validate_parameters()
+            
         # Validate secondary structure constraints
-        for ss_constraint in constraints.secondary_structure:
-            if ss_constraint.end > length:
-                raise ValueError(f"Secondary structure constraint exceeds protein length {length}")
+        ss_regions = []
+        for i, ss_constraint in enumerate(constraints.secondary_structure):
+            if ss_constraint.start < 1 or ss_constraint.start > length:
+                raise ValueError(f"Secondary structure {i+1}: start position must be between 1 and {length}")
+            if ss_constraint.end < 1 or ss_constraint.end > length:
+                raise ValueError(f"Secondary structure {i+1}: end position must be between 1 and {length}")
+            if ss_constraint.start >= ss_constraint.end:
+                raise ValueError(f"Secondary structure {i+1}: start must be less than end")
+            
+            # Check for overlapping secondary structure constraints
+            new_region = (ss_constraint.start, ss_constraint.end)
+            for j, existing_region in enumerate(ss_regions):
+                if (new_region[0] < existing_region[1] and new_region[1] > existing_region[0]):
+                    raise ValueError(f"Secondary structure {i+1} overlaps with secondary structure {j+1}")
+            ss_regions.append(new_region)
+            
+            # Validate constraint parameters
+            ss_constraint.validate_parameters()
+            
+        # Validate biophysical constraints if present
+        for constraint in getattr(constraints, 'other_constraints', []):
+            if hasattr(constraint, 'validate_parameters'):
+                constraint.validate_parameters()
+        
+        # Check constraint density
+        total_constrained_residues = len(occupied_residues)
+        for start, end in ss_regions:
+            total_constrained_residues += (end - start + 1)
+        
+        constraint_density = total_constrained_residues / length
+        if constraint_density > 0.8:
+            raise ValueError(f"Constraint density too high ({constraint_density:.1%}). Maximum 80% of residues can be constrained")
+        
+        # Validate constraint compatibility
+        self._validate_constraint_compatibility(constraints, length)
+    
+    def _validate_constraint_compatibility(self, constraints: Constraints, length: int) -> None:
+        """Check for incompatible constraint combinations."""
+        # Check binding sites vs secondary structure conflicts
+        for binding_site in constraints.binding_sites:
+            for ss_constraint in constraints.secondary_structure:
+                binding_residues = set(binding_site.residues)
+                ss_residues = set(range(ss_constraint.start, ss_constraint.end + 1))
                 
-        # Check for conflicting constraints
-        if len(constraints.binding_sites) > length // 3:
-            raise ValueError("Too many binding sites for protein length")
+                overlap = binding_residues & ss_residues
+                if overlap:
+                    # Some overlap is OK, but warn if extensive
+                    if len(overlap) > 3:
+                        import warnings
+                        warnings.warn(f"Extensive overlap between binding site and secondary structure: {overlap}")
+        
+        # Check for realistic protein constraints
+        total_helix_length = sum(
+            (ss.end - ss.start + 1) for ss in constraints.secondary_structure 
+            if getattr(ss, 'ss_type', 'unknown') == 'helix'
+        )
+        total_sheet_length = sum(
+            (ss.end - ss.start + 1) for ss in constraints.secondary_structure 
+            if getattr(ss, 'ss_type', 'unknown') == 'sheet'
+        )
+        
+        # Warn if protein is all helix or all sheet (unrealistic)
+        if total_helix_length > 0.9 * length:
+            import warnings
+            warnings.warn("Protein is >90% helical - this may be unrealistic")
+        if total_sheet_length > 0.8 * length:
+            import warnings
+            warnings.warn("Protein is >80% sheet - this may be unrealistic")
     
     def _encode_constraints(self, constraints: Constraints) -> torch.Tensor:
         """Encode constraints into neural operator input."""
