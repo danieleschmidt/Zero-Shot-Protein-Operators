@@ -2,7 +2,7 @@
 Functional constraints for protein design.
 
 This module implements constraints related to protein function,
-such as binding sites, catalytic activity, and allosteric regulation.
+including binding sites, catalytic activities, and enzymatic properties.
 """
 
 from typing import List, Optional, Dict, Any

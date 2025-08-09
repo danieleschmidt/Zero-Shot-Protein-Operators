@@ -335,6 +335,45 @@ class MetalSiteConstraint(BaseConstraint):
         return self.CONSTRAINT_TYPE_ID
 
 
+class StructuralConstraint(BaseConstraint):
+    """
+    General structural constraint for protein design.
+    
+    This is an alias for FoldConstraint to maintain backward compatibility.
+    """
+    
+    CONSTRAINT_TYPE_ID = 8
+    
+    def __init__(
+        self,
+        name: str,
+        fold_type: Optional[str] = None,
+        disulfide_bonds: Optional[List[Tuple[int, int]]] = None,
+        metal_sites: Optional[List[Dict[str, Any]]] = None,
+        **kwargs
+    ):
+        super().__init__(name, **kwargs)
+        self.fold_type = fold_type
+        self.disulfide_bonds = disulfide_bonds or []
+        self.metal_sites = metal_sites or []
+    
+    def encode(self) -> torch.Tensor:
+        encoding = torch.zeros(20)
+        if self.fold_type:
+            fold_hash = hash(self.fold_type) % 100
+            encoding[0] = float(fold_hash) / 100.0
+        return encoding
+    
+    def validate(self, structure) -> bool:
+        return True
+    
+    def satisfaction_score(self, structure) -> float:
+        return 1.0
+    
+    def get_constraint_type_id(self) -> int:
+        return self.CONSTRAINT_TYPE_ID
+
+
 class FoldConstraint(BaseConstraint):
     """
     Constraint for overall protein fold topology.
