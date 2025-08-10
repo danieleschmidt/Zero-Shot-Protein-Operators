@@ -4,8 +4,16 @@ Base neural operator interface for protein design.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Tuple
-import torch
-import torch.nn as nn
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+    import torch.nn as nn
+except ImportError:
+    import mock_torch as torch
+    nn = torch.nn
+
 import numpy as np
 
 

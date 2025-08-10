@@ -63,16 +63,87 @@ WORKDIR /app
 # Copy only necessary files
 COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 
 # Install package in production mode
 RUN pip install .
 
-# Create non-root user
-RUN useradd -m -u 1000 proteinops
+# Create non-root user for security
+RUN useradd -m -u 1000 proteinops && \
+    mkdir -p /app/logs /app/models /app/data && \
+    chown -R proteinops:proteinops /app
 USER proteinops
 
-# Default command for production
-CMD ["python", "-m", "protein_operators.cli"]
+# Create volume mount points
+VOLUME ["/app/logs", "/app/models", "/app/data"]
+
+# Expose ports for API and metrics
+EXPOSE 8000 9090
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD python -c "import sys; sys.path.insert(0, 'src'); from protein_operators import ProteinDesigner; print('Health check passed')" || exit 1
+
+# Production command - start API server
+CMD ["python", "-m", "protein_operators.api.app"]
+
+# Enhanced GPU production stage
+FROM nvidia/cuda:11.8-cudnn8-runtime-ubuntu22.04 as gpu
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    CUDA_VISIBLE_DEVICES=0 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Install Python and system dependencies
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        python3.11 \
+        python3.11-dev \
+        python3-pip \
+        python3.11-venv \
+        curl \
+        git \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create symlink for python
+RUN ln -s /usr/bin/python3.11 /usr/bin/python
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY pyproject.toml README.md LICENSE ./
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+
+# Install dependencies
+RUN pip3 install --no-cache-dir .
+
+# Create non-root user
+RUN useradd -m -u 1000 proteinops && \
+    mkdir -p /app/logs /app/models /app/data && \
+    chown -R proteinops:proteinops /app
+USER proteinops
+
+# Create volume mount points
+VOLUME ["/app/logs", "/app/models", "/app/data"]
+
+# Expose ports
+EXPOSE 8000 9090
+
+# GPU health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD python -c "import sys; sys.path.insert(0, 'src'); from protein_operators import ProteinDesigner; print('GPU health check passed')" || exit 1
+
+# GPU-enabled command
+CMD ["python", "-m", "protein_operators.api.app", "--enable-gpu"]
 
 # GPU validation stage
 FROM development as gpu-test

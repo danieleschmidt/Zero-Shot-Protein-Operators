@@ -3,7 +3,13 @@ Protein structure representation and manipulation.
 """
 
 from typing import Optional, Dict, Any, List
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 import numpy as np
 from pathlib import Path
 

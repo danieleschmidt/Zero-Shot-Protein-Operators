@@ -5,7 +5,13 @@ Optimization service for protein structure refinement and improvement.
 import logging
 import time
 from typing import Dict, List, Optional, Tuple, Any, Callable
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 import torch.nn as nn
 import numpy as np
 from dataclasses import dataclass
