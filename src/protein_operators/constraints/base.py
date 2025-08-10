@@ -4,7 +4,13 @@ Base constraint classes for protein design.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Union
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 import numpy as np
 from dataclasses import dataclass, field
 

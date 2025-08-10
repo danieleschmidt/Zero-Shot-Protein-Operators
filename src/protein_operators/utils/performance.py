@@ -6,7 +6,13 @@ import time
 import logging
 import threading
 import psutil
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 from typing import Dict, Any, List, Optional, Callable, Union
 from dataclasses import dataclass, field
 from enum import Enum

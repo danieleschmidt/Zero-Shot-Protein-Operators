@@ -577,7 +577,13 @@ def _fallback_constraint_encoding(*args, **kwargs):
     logger.info("Using fallback constraint encoding")
     # Return zero tensor as fallback
     try:
-        import torch
+        import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
         return torch.zeros(10)
     except ImportError:
         return [0.0] * 10

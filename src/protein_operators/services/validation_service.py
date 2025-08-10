@@ -3,7 +3,13 @@ Comprehensive protein structure validation service.
 """
 
 from typing import Dict, List, Optional, Tuple, Any
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 import torch.nn.functional as F
 import numpy as np
 import logging

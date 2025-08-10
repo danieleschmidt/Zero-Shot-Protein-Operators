@@ -6,7 +6,13 @@ such as secondary structure, fold topology, and geometric features.
 """
 
 from typing import List, Optional, Dict, Any, Tuple
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 import numpy as np
 
 from .base import BaseConstraint

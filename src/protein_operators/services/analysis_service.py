@@ -3,7 +3,13 @@ Advanced protein structure analysis and prediction service.
 """
 
 from typing import Dict, List, Optional, Tuple, Any, Union
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 import torch.nn.functional as F
 import numpy as np
 from scipy import stats

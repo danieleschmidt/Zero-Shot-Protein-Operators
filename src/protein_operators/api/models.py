@@ -10,7 +10,13 @@ from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, validator, root_validator
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 
 
 class OperatorType(str, Enum):

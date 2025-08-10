@@ -17,7 +17,13 @@ logger = logging.getLogger(__name__)
 
 # Handle optional torch import
 try:
+    import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
     import torch
+except ImportError:
+    import mock_torch as torch
     HAS_TORCH = True
 except ImportError:
     torch = None

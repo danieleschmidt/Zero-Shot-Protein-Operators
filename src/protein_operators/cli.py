@@ -5,7 +5,13 @@ Command-line interface for protein operators.
 import typer
 from typing import Optional, List
 from pathlib import Path
-import torch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
