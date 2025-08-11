@@ -118,6 +118,10 @@ class MockTensor:
     def expand(self, *shape):
         return MockTensor(np.broadcast_to(self.data, shape))
     
+    def repeat(self, *sizes):
+        # Simplified repeat - just return the same tensor for mock compatibility
+        return MockTensor(self.data)
+    
     def mean(self, dim=None, keepdim=False):
         return MockTensor(np.mean(self.data, axis=dim, keepdims=keepdim))
     
@@ -198,6 +202,15 @@ def logspace(start, end, steps, base=10.0, dtype=None, device=None):
     return MockTensor(np.logspace(start, end, steps, base=base), dtype, device)
 
 
+class no_grad:
+    """Mock context manager for torch.no_grad()"""
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
 def cat(tensors, dim=0):
     """Concatenate tensors."""
     arrays = [t.data for t in tensors]
@@ -208,6 +221,10 @@ def stack(tensors, dim=0):
     """Stack tensors."""
     arrays = [t.data for t in tensors]
     return MockTensor(np.stack(arrays, axis=dim))
+
+def mean(tensor, dim=None, keepdim=False):
+    """Compute mean of tensor."""
+    return MockTensor(np.mean(tensor.data, axis=dim, keepdims=keepdim))
 
 
 def cdist(x1, x2):

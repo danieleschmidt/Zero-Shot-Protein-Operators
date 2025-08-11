@@ -1,6 +1,6 @@
 {
-  "timestamp": 1754833515.5080848,
-  "total_time": 1.4075443744659424,
+  "timestamp": 1754951774.6978643,
+  "total_time": 1.2886407375335693,
   "summary": {
     "total_gates": 9,
     "passed": 8,
@@ -8,7 +8,7 @@
     "warnings": 0,
     "skipped": 0,
     "critical_failed": 0,
-    "overall_score": 95.64466389079506
+    "overall_score": 95.64606903925903
   },
   "results": [
     {
@@ -16,7 +16,7 @@
       "status": "passed",
       "score": 100.0,
       "message": "All core imports working correctly",
-      "execution_time": 0.18226885795593262,
+      "execution_time": 0.16484284400939941,
       "critical": true,
       "details": {}
     },
@@ -25,7 +25,7 @@
       "status": "failed",
       "score": 88.13559322033898,
       "message": "Syntax errors found in 7 files",
-      "execution_time": 0.20946621894836426,
+      "execution_time": 0.20299267768859863,
       "critical": false,
       "details": {
         "total_files": 59,
@@ -33,13 +33,13 @@
         "syntax_score": 88.13559322033898,
         "quality_issues_count": 4,
         "checks": [
-          "Syntax error in /root/repo/src/protein_operators/api/app.py: unexpected character after line continuation character (app.py, line 136)",
-          "Syntax error in /root/repo/src/protein_operators/api/routes.py: expected 'except' or 'finally' block (routes.py, line 128)",
-          "Syntax error in /root/repo/src/protein_operators/database/connection.py: unterminated triple-quoted string literal (detected at line 33) (connection.py, line 26)",
-          "Syntax error in /root/repo/src/protein_operators/database/models.py: unexpected character after line continuation character (models.py, line 22)",
-          "Syntax error in /root/repo/src/protein_operators/utils/error_handling.py: expected 'except' or 'finally' block (error_handling.py, line 487)",
-          "Syntax error in /root/repo/src/protein_operators/utils/error_recovery.py: expected 'except' or 'finally' block (error_recovery.py, line 581)",
-          "Syntax error in /root/repo/src/protein_operators/utils/validation.py: expected 'except' or 'finally' block (validation.py, line 21)"
+          "Syntax error in src/protein_operators/api/app.py: unexpected character after line continuation character (app.py, line 136)",
+          "Syntax error in src/protein_operators/api/routes.py: expected 'except' or 'finally' block (routes.py, line 128)",
+          "Syntax error in src/protein_operators/database/connection.py: unterminated triple-quoted string literal (detected at line 33) (connection.py, line 26)",
+          "Syntax error in src/protein_operators/database/models.py: unexpected character after line continuation character (models.py, line 22)",
+          "Syntax error in src/protein_operators/utils/error_handling.py: expected 'except' or 'finally' block (error_handling.py, line 487)",
+          "Syntax error in src/protein_operators/utils/error_recovery.py: expected 'except' or 'finally' block (error_recovery.py, line 581)",
+          "Syntax error in src/protein_operators/utils/validation.py: expected 'except' or 'finally' block (validation.py, line 21)"
         ]
       }
     },
@@ -48,7 +48,7 @@
       "status": "passed",
       "score": 100.0,
       "message": "No significant security vulnerabilities found",
-      "execution_time": 0.017230987548828125,
+      "execution_time": 0.016103506088256836,
       "critical": true,
       "details": {
         "total_vulnerabilities": 4,
@@ -56,28 +56,28 @@
         "medium_severity": 4,
         "vulnerabilities": [
           {
-            "file": "/root/repo/src/protein_operators/cache/cache_manager.py",
+            "file": "src/protein_operators/cache/cache_manager.py",
             "line": 1,
             "pattern": "pickle\\.loads?\\s*\\(",
             "description": "Unsafe pickle usage",
             "severity": "medium"
           },
           {
-            "file": "/root/repo/src/protein_operators/cache/cache_manager.py",
+            "file": "src/protein_operators/cache/cache_manager.py",
             "line": 1,
             "pattern": "pickle\\.loads?\\s*\\(",
             "description": "Unsafe pickle usage",
             "severity": "medium"
           },
           {
-            "file": "/root/repo/src/protein_operators/utils/performance_optimizer.py",
+            "file": "src/protein_operators/utils/performance_optimization.py",
             "line": 1,
             "pattern": "pickle\\.loads?\\s*\\(",
             "description": "Unsafe pickle usage",
             "severity": "medium"
           },
           {
-            "file": "/root/repo/src/protein_operators/utils/performance_optimization.py",
+            "file": "src/protein_operators/utils/performance_optimizer.py",
             "line": 1,
             "pattern": "pickle\\.loads?\\s*\\(",
             "description": "Unsafe pickle usage",
@@ -91,7 +91,7 @@
       "status": "passed",
       "score": 100.0,
       "message": "Unit tests passed with 100.0% coverage",
-      "execution_time": 0.09767603874206543,
+      "execution_time": 0.09211945533752441,
       "critical": true,
       "details": {
         "coverage": 100.0,
@@ -104,7 +104,7 @@
       "status": "passed",
       "score": 90.0,
       "message": "Integration tests passed",
-      "execution_time": 0.18338370323181152,
+      "execution_time": 0.1581745147705078,
       "critical": true,
       "details": {}
     },
@@ -113,26 +113,26 @@
       "status": "passed",
       "score": 85.0,
       "message": "Performance benchmarks passed",
-      "execution_time": 0.2723844051361084,
+      "execution_time": 0.25127673149108887,
       "critical": false,
       "details": {
-        "output": "Constraint creation: 0.000s for 100 iterations\n\u2705 benchmark_constraint_creation passed\nCache write: 0.118s, read: 0.002s for 1000 ops\n\u2705 benchmark_cache_performance passed\nPerformance benchmarks: 2/2 passed\n"
+        "output": "Constraint creation: 0.000s for 100 iterations\n\u2705 benchmark_constraint_creation passed\nCache write: 0.110s, read: 0.002s for 1000 ops\n\u2705 benchmark_cache_performance passed\nPerformance benchmarks: 2/2 passed\n"
       }
     },
     {
       "name": "Documentation Validation",
       "status": "passed",
-      "score": 94.84029484029485,
-      "message": "Documentation coverage: 94.8%",
-      "execution_time": 0.2527740001678467,
+      "score": 94.85294117647058,
+      "message": "Documentation coverage: 94.9%",
+      "execution_time": 0.2304527759552002,
       "critical": false,
       "details": {
         "doc_files_found": 5,
         "doc_files_required": 5,
         "missing_docs": [],
-        "docstring_coverage": 89.68058968058969,
-        "total_functions": 814,
-        "documented_functions": 730
+        "docstring_coverage": 89.70588235294117,
+        "total_functions": 816,
+        "documented_functions": 732
       }
     },
     {
@@ -140,7 +140,7 @@
       "status": "passed",
       "score": 107.82608695652173,
       "message": "Research validation passed (2 indicators)",
-      "execution_time": 0.008994579315185547,
+      "execution_time": 0.008483648300170898,
       "critical": false,
       "details": {
         "validation_points": [
@@ -149,7 +149,7 @@
         ],
         "science_indicators": 45,
         "citations_found": true,
-        "research_files": 2
+        "research_files": 3
       }
     },
     {
@@ -157,7 +157,7 @@
       "status": "passed",
       "score": 95.0,
       "message": "Complete system integration validated",
-      "execution_time": 0.18119239807128906,
+      "execution_time": 0.16217255592346191,
       "critical": true,
       "details": {}
     }

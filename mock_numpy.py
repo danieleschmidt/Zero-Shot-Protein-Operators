@@ -45,13 +45,45 @@ class ndarray:
         return ndarray(self.data[key])
     
     def __setitem__(self, key, value):
-        self.data[key] = value
+        if isinstance(key, tuple) and len(key) == 2:
+            # Handle 2D indexing like arr[i, j]
+            if isinstance(self.data, list):
+                # Convert list to list-of-lists for 2D access
+                rows, cols = self.shape if hasattr(self, 'shape') else (len(self.data), 1)
+                if not isinstance(self.data[0], list):
+                    # Flatten and reshape
+                    self.data = [[0] * cols for _ in range(rows)]
+            
+            row, col = key
+            self.data[row][col] = value
+        else:
+            self.data[key] = value
     
     def astype(self, dtype):
         return ndarray(self.data, dtype)
     
     def copy(self):
         return ndarray(self.data[:] if isinstance(self.data, list) else self.data)
+    
+    def reshape(self, shape):
+        # Simple reshape implementation
+        if isinstance(self.data, list):
+            flat = []
+            def flatten(arr):
+                for item in arr:
+                    if isinstance(item, list):
+                        flatten(item)
+                    else:
+                        flat.append(item)
+            flatten(self.data)
+            
+            if shape == (-1,):  # Flatten
+                return ndarray(flat)
+            else:
+                # For now, just return flattened data for any other shape
+                return ndarray(flat)
+        else:
+            return ndarray(self.data)
     
     def tolist(self):
         return self.data
@@ -175,7 +207,7 @@ def max(a, axis=None, keepdims=False):
         data = a
     
     if isinstance(data, (list, tuple)) and len(data) > 0:
-        return max(data)
+        return __builtins__['max'](data)  # Use Python's built-in max
     return 0.0
 
 
@@ -199,7 +231,7 @@ def sum(a, axis=None, keepdims=False):
         data = a
     
     if isinstance(data, (list, tuple)):
-        return sum(data)
+        return __builtins__['sum'](data)  # Use Python's built-in sum, not our mock
     return data
 
 

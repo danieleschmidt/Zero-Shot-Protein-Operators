@@ -52,12 +52,20 @@ class SecondaryStructureConstraint(BaseConstraint):
         self.ss_type = ss_type
         self.confidence = confidence
         
-        if start >= end:
+        self.validate_parameters()
+    
+    def validate_parameters(self) -> None:
+        """Validate constraint parameters for consistency."""
+        if self.start >= self.end:
             raise ValueError("Start position must be less than end position")
-        if ss_type not in ["helix", "sheet", "loop", "turn"]:
-            raise ValueError(f"Unknown secondary structure type: {ss_type}")
-        if not 0 <= confidence <= 1:
+        if self.ss_type not in ["helix", "sheet", "loop", "turn"]:
+            raise ValueError(f"Unknown secondary structure type: {self.ss_type}")
+        if not 0 <= self.confidence <= 1:
             raise ValueError("Confidence must be between 0 and 1")
+        if self.start < 1:
+            raise ValueError("Start position must be positive")
+        if self.end < 1:
+            raise ValueError("End position must be positive")
     
     @property
     def length(self) -> int:
