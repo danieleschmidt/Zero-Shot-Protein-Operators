@@ -56,10 +56,21 @@ class BindingSiteConstraint(BaseConstraint):
         self.selectivity_fold = selectivity_fold
         self.binding_mode = binding_mode
         
-        if not residues:
+        self.validate_parameters()
+    
+    def validate_parameters(self) -> None:
+        """Validate constraint parameters for consistency."""
+        if not self.residues:
             raise ValueError("Binding site must contain at least one residue")
-        if any(res < 1 for res in residues):
+        
+        if any(res < 1 for res in self.residues):
             raise ValueError("Residue indices must be positive")
+        
+        if self.affinity_nm is not None and self.affinity_nm <= 0:
+            raise ValueError("Affinity must be positive")
+        
+        if self.selectivity_fold is not None and self.selectivity_fold < 1.0:
+            raise ValueError("Selectivity fold must be >= 1.0")
     
     def encode(self) -> torch.Tensor:
         """Encode binding site constraint as tensor."""
