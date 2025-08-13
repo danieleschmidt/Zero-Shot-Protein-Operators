@@ -70,19 +70,28 @@ RUN pip install .
 
 # Create non-root user for security
 RUN useradd -m -u 1000 proteinops && \
-    mkdir -p /app/logs /app/models /app/data && \
+    mkdir -p /app/logs /app/models /app/data /app/config && \
     chown -R proteinops:proteinops /app
+
+# Copy production configuration
+COPY docker/config/ ./config/
+
 USER proteinops
 
 # Create volume mount points
-VOLUME ["/app/logs", "/app/models", "/app/data"]
+VOLUME ["/app/logs", "/app/models", "/app/data", "/app/config"]
 
 # Expose ports for API and metrics
 EXPOSE 8000 9090
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD python -c "import sys; sys.path.insert(0, 'src'); from protein_operators import ProteinDesigner; print('Health check passed')" || exit 1
+# Health check with improved error handling
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
+  CMD python -c "import sys; sys.path.insert(0, 'src'); from protein_operators.utils.health_monitoring import HealthMonitor; monitor = HealthMonitor(); status = monitor.get_system_health(); print('Health check passed' if status['overall_status'] == 'healthy' else 'Health check failed'); exit(0 if status['overall_status'] == 'healthy' else 1)" || exit 1
+
+# Set production environment variables
+ENV PROTEIN_OPERATORS_ENV=production
+ENV PROTEIN_OPERATORS_LOG_LEVEL=INFO
+ENV PROTEIN_OPERATORS_CONFIG_PATH=/app/config
 
 # Production command - start API server
 CMD ["python", "-m", "protein_operators.api.app"]

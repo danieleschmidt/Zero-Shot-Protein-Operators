@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: protein-operators-service
+  namespace: protein-operators
+  labels:
+    app: protein-operators
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: api
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: protein-operators
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: protein-operators-gpu-service
+  namespace: protein-operators
+  labels:
+    app: protein-operators-gpu
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: api
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: protein-operators-gpu
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: protein-operators-headless
+  namespace: protein-operators
+  labels:
+    app: protein-operators
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: api
+  selector:
+    app: protein-operators
