@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: protein-operators-gpu
+  namespace: protein-operators
+  labels:
+    app: protein-operators-gpu
+    version: v1.0.0
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: protein-operators-gpu
+  template:
+    metadata:
+      labels:
+        app: protein-operators-gpu
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: protein-operators
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: protein-operators-gpu
+        image: protein-operators:gpu-latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: api
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: PROTEIN_OPERATORS_ENV
+          value: "production"
+        - name: PROTEIN_OPERATORS_CONFIG_PATH
+          value: "/app/config"
+        - name: PROTEIN_OPERATORS_LOG_LEVEL
+          value: "INFO"
+        - name: PYTHONPATH
+          value: "/app/src"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "all"
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: "compute,utility"
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: models
+          mountPath: /app/models
+        - name: logs
+          mountPath: /app/logs
+        - name: data
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "16Gi"
+            cpu: "8"
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 24
+      volumes:
+      - name: config
+        configMap:
+          name: protein-operators-config
+      - name: models
+        persistentVolumeClaim:
+          claimName: protein-operators-models
+      - name: logs
+        persistentVolumeClaim:
+          claimName: protein-operators-logs
+      - name: data
+        persistentVolumeClaim:
+          claimName: protein-operators-data
+      nodeSelector:
+        accelerator: nvidia-tesla-v100
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"

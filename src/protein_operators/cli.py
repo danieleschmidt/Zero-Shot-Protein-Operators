@@ -206,8 +206,156 @@ def train(
     console.print("[yellow]Training functionality not yet implemented[/yellow]")
 
 
+# Add new commands
+@app.command()
+def interactive(
+    operator: str = typer.Option("deeponet", "--operator", help="Neural operator type"),
+    checkpoint: Optional[Path] = typer.Option(None, "--checkpoint", help="Model checkpoint"),
+):
+    """
+    Start an interactive protein design session.
+    """
+    console.print(f"[bold blue]🖥️ Interactive Protein Design Session[/bold blue]")
+    console.print(f"Using {operator} operator")
+    console.print("Type 'help' for commands or 'quit' to exit.\n")
+    
+    # Initialize designer
+    try:
+        designer = ProteinDesigner(operator_type=operator, checkpoint=checkpoint)
+        constraints = Constraints()
+    except Exception as e:
+        console.print(f"[red]❌ Failed to initialize designer: {e}[/red]")
+        raise typer.Exit(1)
+    
+    commands_help = """
+[bold cyan]Available Commands:[/bold cyan]
+  add-binding <residues> <ligand> [affinity] - Add binding site constraint
+  add-ss <start> <end> <type>               - Add secondary structure constraint
+  list-constraints                          - Show current constraints
+  clear-constraints                         - Clear all constraints
+  design <length> [output.pdb]             - Generate protein design
+  validate <file.pdb>                       - Validate structure
+  help                                      - Show this help
+  quit                                      - Exit session
+
+[bold yellow]Examples:[/bold yellow]
+  add-binding 45,67,89 ATP 100
+  add-ss 10 30 helix
+  design 150 my_protein.pdb
+    """
+    
+    while True:
+        try:
+            command = console.input("[bold green]protein-operators>[/bold green] ").strip()
+            
+            if command.lower() in ["quit", "exit", "q"]:
+                console.print("Goodbye! 👋")
+                break
+            elif command.lower() == "help":
+                console.print(commands_help)
+            elif command.startswith("add-binding"):
+                parts = command.split()[1:]
+                if len(parts) >= 2:
+                    residues = [int(x) for x in parts[0].split(",")]
+                    ligand = parts[1]
+                    affinity = float(parts[2]) if len(parts) > 2 else None
+                    constraints.add_binding_site(residues=residues, ligand=ligand, affinity_nm=affinity)
+                    console.print(f"✅ Added binding site: {residues} for {ligand}")
+                else:
+                    console.print("[red]Usage: add-binding <residues> <ligand> [affinity][/red]")
+            elif command.startswith("add-ss"):
+                parts = command.split()[1:]
+                if len(parts) >= 3:
+                    start, end, ss_type = int(parts[0]), int(parts[1]), parts[2]
+                    constraints.add_secondary_structure(start=start, end=end, ss_type=ss_type)
+                    console.print(f"✅ Added secondary structure: {ss_type} from {start} to {end}")
+                else:
+                    console.print("[red]Usage: add-ss <start> <end> <type>[/red]")
+            elif command == "list-constraints":
+                if len(constraints) == 0:
+                    console.print("No constraints defined")
+                else:
+                    console.print(f"[bold]Current constraints ({len(constraints)}):[/bold]")
+                    for i, constraint in enumerate(constraints):
+                        console.print(f"  {i+1}. {constraint}")
+            elif command == "clear-constraints":
+                constraints = Constraints()
+                console.print("✅ All constraints cleared")
+            elif command.startswith("design"):
+                parts = command.split()[1:]
+                if len(parts) >= 1:
+                    length = int(parts[0])
+                    output_file = parts[1] if len(parts) > 1 else f"design_{length}aa.pdb"
+                    
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[progress.description]{task.description}"),
+                        console=console,
+                    ) as progress:
+                        task = progress.add_task(f"Generating {length}-residue protein...", total=None)
+                        
+                        structure = designer.generate(constraints=constraints, length=length)
+                        
+                        progress.update(task, description="Saving structure...")
+                        structure.save_pdb(Path(output_file))
+                        
+                        progress.update(task, description="Validating...")
+                        metrics = designer.validate(structure)
+                    
+                    console.print(f"✅ Design saved to {output_file}")
+                    console.print(f"Overall score: {metrics['overall_score']:.3f}")
+                else:
+                    console.print("[red]Usage: design <length> [output.pdb][/red]")
+            elif command.startswith("validate"):
+                parts = command.split()[1:]
+                if len(parts) >= 1:
+                    from .structure import ProteinStructure
+                    
+                    structure = ProteinStructure.from_pdb(Path(parts[0]))
+                    metrics = designer.validate(structure)
+                    
+                    console.print(f"[bold]Validation results for {parts[0]}:[/bold]")
+                    for metric, score in metrics.items():
+                        if isinstance(score, (int, float)) and metric != "num_clashes":
+                            console.print(f"  {metric.replace('_', ' ').title()}: {score:.3f}")
+                else:
+                    console.print("[red]Usage: validate <file.pdb>[/red]")
+            elif command.strip():
+                console.print(f"[red]Unknown command: {command}[/red]")
+                console.print("Type 'help' for available commands.")
+        
+        except KeyboardInterrupt:
+            console.print("\n\nGoodbye! 👋")
+            break
+        except Exception as e:
+            console.print(f"[red]❌ Error: {e}[/red]")
+
+@app.command()
+def benchmark(
+    suite: str = typer.Option("all", "--suite", help="Benchmark suite: design, validation, or all"),
+    output: Optional[Path] = typer.Option(None, "--output", help="Output benchmark results"),
+    iterations: int = typer.Option(10, "--iterations", help="Number of iterations"),
+):
+    """
+    Run performance benchmarks for the protein design pipeline.
+    """
+    console.print(f"[bold blue]⚡ Running {suite} benchmarks[/bold blue]")
+    console.print(f"Iterations: {iterations}")
+    
+    # Placeholder for benchmark implementation
+    console.print("\n[yellow]⚠️ Benchmarking functionality is under development.[/yellow]")
+    console.print("\n[bold]Planned Benchmarks:[/bold]")
+    console.print("• Design speed (proteins/second)")
+    console.print("• Memory usage profiling")
+    console.print("• Constraint satisfaction accuracy")
+    console.print("• Structure quality metrics")
+    console.print("• GPU utilization efficiency")
+    
+    if output:
+        console.print(f"\nResults would be saved to: {output}")
+
 def main():
-    """Main entry point for the CLI."""
+    """Enhanced main entry point for the CLI."""
     app()
 
 

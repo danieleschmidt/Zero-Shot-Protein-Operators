@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: protein-operators-config
+  namespace: protein-operators
+  labels:
+    app: protein-operators
+data:
+  production.yaml: |
+    # Production configuration for Protein Operators
+    environment: production
+    
+    # Logging configuration
+    logging:
+      level: INFO
+      format: json
+      enable_structured_logs: true
+      log_to_file: true
+      file_path: /app/logs/protein-operators.log
+      max_file_size: 100MB
+      backup_count: 5
+    
+    # Performance settings
+    performance:
+      enable_caching: true
+      cache_size: 1000
+      enable_gpu: true
+      max_workers: 4
+      batch_size: 32
+      enable_distributed: true
+    
+    # Health monitoring
+    health:
+      enable_monitoring: true
+      check_interval: 30
+      memory_threshold: 80
+      cpu_threshold: 80
+      disk_threshold: 85
+    
+    # API settings
+    api:
+      host: "0.0.0.0"
+      port: 8000
+      workers: 4
+      enable_cors: true
+      rate_limit: 100
+      timeout: 300
+    
+    # Neural operator settings
+    neural_operators:
+      default_operator: "deeponet"
+      model_cache_size: 5
+      enable_model_warming: true
+      checkpoint_path: "/app/models"
+    
+    # Database configuration
+    database:
+      enable_persistence: true
+      connection_pool_size: 10
+      query_timeout: 30
+    
+    # Security settings
+    security:
+      enable_auth: true
+      token_expiry: 3600
+      rate_limiting: true
+      cors_origins: ["*"]
+    
+    # Metrics and monitoring
+    metrics:
+      enable_prometheus: true
+      metrics_port: 9090
+      enable_custom_metrics: true
+    
+    # Resource limits
+    resources:
+      memory_limit: "8Gi"
+      cpu_limit: "4"
+      gpu_memory_limit: "16Gi"
