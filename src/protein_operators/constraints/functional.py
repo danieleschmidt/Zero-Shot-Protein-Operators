@@ -59,18 +59,50 @@ class BindingSiteConstraint(BaseConstraint):
         self.validate_parameters()
     
     def validate_parameters(self) -> None:
-        """Validate constraint parameters for consistency."""
+        """Enhanced parameter validation with detailed checks."""
         if not self.residues:
             raise ValueError("Binding site must contain at least one residue")
         
         if any(res < 1 for res in self.residues):
-            raise ValueError("Residue indices must be positive")
+            raise ValueError("Residue indices must be positive (1-based indexing)")
         
-        if self.affinity_nm is not None and self.affinity_nm <= 0:
-            raise ValueError("Affinity must be positive")
+        # Check for duplicate residues
+        if len(set(self.residues)) != len(self.residues):
+            raise ValueError("Duplicate residues in binding site")
         
-        if self.selectivity_fold is not None and self.selectivity_fold < 1.0:
-            raise ValueError("Selectivity fold must be >= 1.0")
+        # Validate affinity
+        if self.affinity_nm is not None:
+            if self.affinity_nm <= 0:
+                raise ValueError("Binding affinity must be positive")
+            if self.affinity_nm > 1e6:  # 1 mM
+                import warnings
+                warnings.warn("Very weak binding affinity (>1mM) - may be difficult to achieve")
+            if self.affinity_nm < 0.001:  # 1 pM
+                import warnings
+                warnings.warn("Extremely strong binding affinity (<1pM) - may be unrealistic")
+        
+        # Validate selectivity
+        if self.selectivity_fold is not None:
+            if self.selectivity_fold < 1.0:
+                raise ValueError("Selectivity fold must be >= 1.0")
+            if self.selectivity_fold > 10000:
+                import warnings
+                warnings.warn("Extremely high selectivity (>10,000x) - may be very challenging")
+        
+        # Check binding site size constraints
+        if len(self.residues) > 20:
+            import warnings
+            warnings.warn("Very large binding site (>20 residues) - may be difficult to design")
+        elif len(self.residues) < 2:
+            import warnings
+            warnings.warn("Very small binding site (<2 residues) - may lack stability")
+        
+        # Validate binding mode
+        valid_modes = ["competitive", "allosteric", "covalent", "cooperative"]
+        if self.binding_mode not in valid_modes:
+            import warnings
+            warnings.warn(f"Unknown binding mode '{self.binding_mode}' - using 'competitive'")
+            self.binding_mode = "competitive"
     
     def encode(self) -> torch.Tensor:
         """Encode binding site constraint as tensor."""

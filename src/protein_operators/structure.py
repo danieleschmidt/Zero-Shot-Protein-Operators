@@ -338,3 +338,192 @@ class ProteinStructure:
                 ss_assignment[i] = 'H'
         
         return ss_assignment
+    
+    def estimate_stability(self) -> Dict[str, float]:
+        """
+        Estimate thermodynamic stability using structural features.
+        
+        Returns:
+            Dictionary with stability metrics
+        """
+        stability_metrics = {}
+        
+        # Compactness factor
+        rg = self.compute_radius_of_gyration()
+        ideal_rg = 2.2 * (self.num_residues ** 0.38)  # Empirical scaling
+        compactness = 1.0 - abs(rg - ideal_rg) / ideal_rg
+        stability_metrics['compactness_score'] = max(0.0, compactness)
+        
+        # Secondary structure content
+        ss = self.compute_secondary_structure_simple()
+        helix_content = ss.count('H') / len(ss)
+        sheet_content = ss.count('E') / len(ss)
+        
+        # Balanced secondary structure is generally more stable
+        ss_balance = 1.0 - abs(helix_content - 0.4) - abs(sheet_content - 0.3)
+        stability_metrics['ss_balance_score'] = max(0.0, ss_balance)
+        
+        # Local packing quality (simplified)
+        contact_map = self.compute_contact_map(cutoff=8.0)
+        total_contacts = torch.sum(contact_map) / 2  # Symmetric matrix
+        contact_density = total_contacts / (self.num_residues * (self.num_residues - 1) / 2)
+        stability_metrics['contact_density'] = contact_density.item()
+        
+        # Overall stability estimate
+        overall_stability = (
+            0.4 * stability_metrics['compactness_score'] +
+            0.3 * stability_metrics['ss_balance_score'] +
+            0.3 * min(1.0, stability_metrics['contact_density'] * 5)  # Scale contact density
+        )
+        stability_metrics['overall_stability'] = overall_stability
+        
+        return stability_metrics
+    
+    def analyze_binding_sites(self) -> Dict[str, Any]:
+        """
+        Analyze potential binding sites in the structure.
+        
+        Returns:
+            Dictionary with binding site analysis
+        """
+        if not hasattr(self, 'constraints') or not self.constraints:
+            return {'message': 'No constraints available for analysis'}
+        
+        binding_analysis = {}
+        binding_sites = getattr(self.constraints, 'binding_sites', [])
+        
+        for i, binding_site in enumerate(binding_sites):
+            site_name = f"binding_site_{i+1}"
+            site_analysis = {}
+            
+            # Check if all residues are valid
+            valid_residues = [r for r in binding_site.residues if 0 <= r < self.num_residues]
+            if not valid_residues:
+                site_analysis['status'] = 'invalid_residues'
+                continue
+            
+            # Compute spatial clustering of binding site residues
+            site_coords = self.coordinates[valid_residues]
+            center = torch.mean(site_coords, dim=0)
+            distances = torch.norm(site_coords - center, dim=1)
+            
+            site_analysis['center'] = center.tolist()
+            site_analysis['max_distance'] = torch.max(distances).item()
+            site_analysis['avg_distance'] = torch.mean(distances).item()
+            site_analysis['clustering_score'] = float(torch.exp(-torch.std(distances)))
+            
+            # Assess accessibility (simplified)
+            # Count contacts with other residues
+            site_contacts = 0
+            for res_idx in valid_residues:
+                for other_idx in range(self.num_residues):
+                    if other_idx not in valid_residues:
+                        dist = torch.norm(self.coordinates[res_idx] - self.coordinates[other_idx])
+                        if dist < 8.0:  # Contact distance
+                            site_contacts += 1
+            
+            site_analysis['external_contacts'] = site_contacts
+            site_analysis['accessibility_score'] = min(1.0, site_contacts / (len(valid_residues) * 5))
+            
+            binding_analysis[site_name] = site_analysis
+        
+        return binding_analysis
+    
+    def compute_druggability_score(self) -> float:
+        """
+        Estimate druggability of the protein structure.
+        
+        Returns:
+            Druggability score (0-1, higher is more druggable)
+        """
+        # This is a simplified druggability assessment
+        # Real druggability would require pocket detection and analysis
+        
+        factors = []
+        
+        # Size factor - larger proteins often have more druggable pockets
+        size_score = min(1.0, self.num_residues / 300.0)
+        factors.append(('size', size_score, 0.2))
+        
+        # Secondary structure diversity
+        ss = self.compute_secondary_structure_simple()
+        helix_frac = ss.count('H') / len(ss)
+        sheet_frac = ss.count('E') / len(ss)
+        loop_frac = ss.count('C') / len(ss)
+        
+        # More diverse structures often have better pockets
+        ss_diversity = 1.0 - max(helix_frac, sheet_frac, loop_frac)
+        factors.append(('ss_diversity', ss_diversity, 0.3))
+        
+        # Compactness - moderately compact proteins are often more druggable
+        rg = self.compute_radius_of_gyration()
+        ideal_rg = 2.2 * (self.num_residues ** 0.38)
+        compactness = rg / ideal_rg
+        compactness_score = 1.0 - abs(compactness - 1.0)
+        factors.append(('compactness', compactness_score, 0.3))
+        
+        # Contact density - moderate density suggests good pocket formation
+        contact_map = self.compute_contact_map(cutoff=8.0)
+        contact_density = torch.sum(contact_map) / (self.num_residues ** 2)
+        density_score = 1.0 - abs(contact_density.item() - 0.15)  # Optimal around 15%
+        factors.append(('contact_density', max(0.0, density_score), 0.2))
+        
+        # Weighted combination
+        druggability = sum(score * weight for _, score, weight in factors)
+        
+        return max(0.0, min(1.0, druggability))
+    
+    def get_structure_quality_report(self) -> Dict[str, Any]:
+        """
+        Generate comprehensive structure quality report.
+        
+        Returns:
+            Detailed quality assessment
+        """
+        report = {}
+        
+        # Basic geometry
+        report['geometry'] = self.validate_geometry()
+        
+        # Stability assessment
+        report['stability'] = self.estimate_stability()
+        
+        # Binding site analysis
+        report['binding_sites'] = self.analyze_binding_sites()
+        
+        # Druggability
+        report['druggability_score'] = self.compute_druggability_score()
+        
+        # Secondary structure content
+        ss = self.compute_secondary_structure_simple()
+        report['secondary_structure'] = {
+            'helix_content': ss.count('H') / len(ss),
+            'sheet_content': ss.count('E') / len(ss),
+            'coil_content': ss.count('C') / len(ss),
+            'assignment': ''.join(ss)
+        }
+        
+        # Overall quality score
+        geometry_score = 1.0 - min(1.0, report['geometry'].get('avg_bond_deviation', 0.0) / 0.5)
+        clash_penalty = min(1.0, report['geometry'].get('num_clashes', 0) / 10.0)
+        stability_score = report['stability']['overall_stability']
+        
+        overall_quality = (
+            0.4 * geometry_score +
+            0.3 * stability_score +
+            0.3 * (1.0 - clash_penalty)
+        )
+        
+        report['overall_quality_score'] = max(0.0, overall_quality)
+        
+        # Quality classification
+        if overall_quality >= 0.8:
+            report['quality_class'] = 'Excellent'
+        elif overall_quality >= 0.6:
+            report['quality_class'] = 'Good'
+        elif overall_quality >= 0.4:
+            report['quality_class'] = 'Fair'
+        else:
+            report['quality_class'] = 'Poor'
+        
+        return report

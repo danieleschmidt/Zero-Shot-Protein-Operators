@@ -1,573 +1,561 @@
 """
-Health monitoring and system diagnostics for protein operators.
+Enhanced health monitoring and system diagnostics for protein operators.
 """
 
 import time
 import threading
-
-try:
-    import psutil
-    HAS_PSUTIL = True
-except ImportError:
-    HAS_PSUTIL = False
-import json
-from typing import Dict, Any, List, Optional, Callable
+import logging
+from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from pathlib import Path
+from enum import Enum
+import psutil
 import sys
 import os
-from enum import Enum
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+try:
+    import torch
+except ImportError:
+    import mock_torch as torch
+
 
 class HealthStatus(Enum):
-    """Health status levels."""
+    """System health status levels."""
     HEALTHY = "healthy"
     WARNING = "warning"
     CRITICAL = "critical"
-    UNKNOWN = "unknown"
+    FAILING = "failing"
+
 
 @dataclass
 class HealthMetric:
-    """Single health metric."""
+    """Individual health metric data."""
     name: str
     value: float
-    unit: str
     status: HealthStatus
-    threshold_warning: Optional[float] = None
-    threshold_critical: Optional[float] = None
-    timestamp: datetime = field(default_factory=datetime.utcnow)
-    description: str = ""
+    message: str
+    timestamp: float = field(default_factory=time.time)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
-class SystemMetrics:
-    """System-level metrics."""
+class SystemResources:
+    """System resource utilization metrics."""
     cpu_percent: float
     memory_percent: float
     memory_available_gb: float
-    disk_usage_percent: float
+    disk_percent: float
     gpu_memory_percent: Optional[float] = None
-    gpu_utilization_percent: Optional[float] = None
-    process_memory_mb: float = 0.0
-    process_cpu_percent: float = 0.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    gpu_utilization: Optional[float] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'cpu_percent': self.cpu_percent,
+            'memory_percent': self.memory_percent,
+            'memory_available_gb': self.memory_available_gb,
+            'disk_percent': self.disk_percent,
+            'gpu_memory_percent': self.gpu_memory_percent,
+            'gpu_utilization': self.gpu_utilization
+        }
 
-@dataclass
-class ApplicationMetrics:
-    """Application-specific metrics."""
-    designs_completed: int = 0
-    validation_errors: int = 0
-    average_design_time_ms: float = 0.0
-    cache_hit_rate: float = 0.0
-    active_sessions: int = 0
-    queue_size: int = 0
-    error_rate_per_hour: float = 0.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 class HealthMonitor:
-    """Health monitoring system for protein operators."""
+    """
+    Comprehensive health monitoring system for protein operators.
     
-    def __init__(
-        self,
-        check_interval: int = 30,  # seconds
-        history_size: int = 1000,
-        enable_gpu_monitoring: bool = True
-    ):
+    Monitors system resources, operation performance, error rates,
+    and provides intelligent health assessments.
+    """
+    
+    def __init__(self, check_interval: float = 30.0):
+        """
+        Initialize health monitor.
+        
+        Args:
+            check_interval: Interval between health checks in seconds
+        """
         self.check_interval = check_interval
-        self.history_size = history_size
-        self.enable_gpu_monitoring = enable_gpu_monitoring
+        self.logger = logging.getLogger(__name__)
         
-        # Metrics storage
-        self.system_metrics_history: List[SystemMetrics] = []
-        self.app_metrics_history: List[ApplicationMetrics] = []
-        self.health_metrics: Dict[str, HealthMetric] = {}
+        # Health metrics storage
+        self.metrics: Dict[str, List[HealthMetric]] = {}
+        self.current_status = HealthStatus.HEALTHY
         
-        # Monitoring state
-        self.is_monitoring = False
-        self.monitor_thread: Optional[threading.Thread] = None
-        self._lock = threading.Lock()
+        # Performance tracking
+        self.operation_times: Dict[str, List[float]] = {}
+        self.error_counts: Dict[str, int] = {}
+        self.success_counts: Dict[str, int] = {}
         
-        # Health checks registry
+        # Resource tracking
+        self.resource_history: List[SystemResources] = []
+        
+        # Health check functions
         self.health_checks: Dict[str, Callable[[], HealthMetric]] = {}
         
-        # Application counters
-        self._app_counters = {
-            'designs_completed': 0,
-            'validation_errors': 0,
-            'design_times': [],
-            'active_sessions': set(),
-            'errors_by_hour': {}
-        }
+        # Monitoring thread
+        self._monitoring = False
+        self._monitor_thread = None
+        self._lock = threading.Lock()
         
-        # Setup default health checks
-        self._setup_default_health_checks()
+        # Register default health checks
+        self._register_default_checks()
     
-    def _setup_default_health_checks(self):
-        """Setup default system health checks."""
-        
-        def check_cpu_usage() -> HealthMetric:
-            if not HAS_PSUTIL:
-                return HealthMetric(
-                    name="cpu_usage",
-                    value=0.0,
-                    unit="percent",
-                    status=HealthStatus.UNKNOWN,
-                    description="psutil not available for CPU monitoring"
-                )
-            
-            cpu_percent = psutil.cpu_percent(interval=1)
-            status = HealthStatus.HEALTHY
-            if cpu_percent > 90:
-                status = HealthStatus.CRITICAL
-            elif cpu_percent > 70:
-                status = HealthStatus.WARNING
-            
-            return HealthMetric(
-                name="cpu_usage",
-                value=cpu_percent,
-                unit="percent",
-                status=status,
-                threshold_warning=70.0,
-                threshold_critical=90.0,
-                description="CPU utilization percentage"
-            )
-        
-        def check_memory_usage() -> HealthMetric:
-            if not HAS_PSUTIL:
-                return HealthMetric(
-                    name="memory_usage",
-                    value=0.0,
-                    unit="percent",
-                    status=HealthStatus.UNKNOWN,
-                    description="psutil not available for memory monitoring"
-                )
-            
-            memory = psutil.virtual_memory()
-            status = HealthStatus.HEALTHY
-            if memory.percent > 90:
-                status = HealthStatus.CRITICAL
-            elif memory.percent > 80:
-                status = HealthStatus.WARNING
-            
-            return HealthMetric(
-                name="memory_usage",
-                value=memory.percent,
-                unit="percent",
-                status=status,
-                threshold_warning=80.0,
-                threshold_critical=90.0,
-                description="System memory usage percentage"
-            )
-        
-        def check_disk_space() -> HealthMetric:
-            if not HAS_PSUTIL:
-                return HealthMetric(
-                    name="disk_usage",
-                    value=0.0,
-                    unit="percent",
-                    status=HealthStatus.UNKNOWN,
-                    description="psutil not available for disk monitoring"
-                )
-            
-            disk = psutil.disk_usage('/')
-            disk_percent = (disk.used / disk.total) * 100
-            status = HealthStatus.HEALTHY
-            if disk_percent > 95:
-                status = HealthStatus.CRITICAL
-            elif disk_percent > 85:
-                status = HealthStatus.WARNING
-            
-            return HealthMetric(
-                name="disk_usage",
-                value=disk_percent,
-                unit="percent",
-                status=status,
-                threshold_warning=85.0,
-                threshold_critical=95.0,
-                description="Disk space usage percentage"
-            )
-        
-        def check_process_memory() -> HealthMetric:
-            if not HAS_PSUTIL:
-                return HealthMetric(
-                    name="process_memory",
-                    value=0.0,
-                    unit="MB",
-                    status=HealthStatus.UNKNOWN,
-                    description="psutil not available for process monitoring"
-                )
-            
-            process = psutil.Process()
-            memory_mb = process.memory_info().rss / 1024 / 1024
-            status = HealthStatus.HEALTHY
-            if memory_mb > 8192:  # 8GB
-                status = HealthStatus.CRITICAL
-            elif memory_mb > 4096:  # 4GB
-                status = HealthStatus.WARNING
-            
-            return HealthMetric(
-                name="process_memory",
-                value=memory_mb,
-                unit="MB",
-                status=status,
-                threshold_warning=4096.0,
-                threshold_critical=8192.0,
-                description="Process memory usage in MB"
-            )
-        
-        # Register default checks
-        self.register_health_check("cpu_usage", check_cpu_usage)
-        self.register_health_check("memory_usage", check_memory_usage)
-        self.register_health_check("disk_usage", check_disk_space)
-        self.register_health_check("process_memory", check_process_memory)
-        
-        # GPU health check if available
-        if self.enable_gpu_monitoring:
-            def check_gpu_memory() -> HealthMetric:
-                try:
-                    import torch
-                    if torch.cuda.is_available():
-                        gpu_memory = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated() * 100
-                        status = HealthStatus.HEALTHY
-                        if gpu_memory > 90:
-                            status = HealthStatus.CRITICAL
-                        elif gpu_memory > 80:
-                            status = HealthStatus.WARNING
-                        
-                        return HealthMetric(
-                            name="gpu_memory",
-                            value=gpu_memory,
-                            unit="percent",
-                            status=status,
-                            threshold_warning=80.0,
-                            threshold_critical=90.0,
-                            description="GPU memory usage percentage"
-                        )
-                except ImportError:
-                    pass
-                
-                return HealthMetric(
-                    name="gpu_memory",
-                    value=0.0,
-                    unit="percent",
-                    status=HealthStatus.UNKNOWN,
-                    description="GPU not available"
-                )
-            
-            self.register_health_check("gpu_memory", check_gpu_memory)
+    def _register_default_checks(self) -> None:
+        """Register default health check functions."""
+        self.register_health_check("system_resources", self._check_system_resources)
+        self.register_health_check("gpu_health", self._check_gpu_health)
+        self.register_health_check("operation_performance", self._check_operation_performance)
+        self.register_health_check("error_rates", self._check_error_rates)
+        self.register_health_check("memory_leaks", self._check_memory_leaks)
     
-    def register_health_check(self, name: str, check_func: Callable[[], HealthMetric]):
-        """Register a custom health check."""
+    def register_health_check(self, name: str, check_func: Callable[[], HealthMetric]) -> None:
+        """
+        Register a custom health check function.
+        
+        Args:
+            name: Name of the health check
+            check_func: Function that returns a HealthMetric
+        """
         self.health_checks[name] = check_func
+        self.logger.info(f"Registered health check: {name}")
     
-    def start_monitoring(self):
-        """Start the health monitoring thread."""
-        if self.is_monitoring:
+    def start_monitoring(self) -> None:
+        """Start continuous health monitoring."""
+        if self._monitoring:
+            self.logger.warning("Health monitoring already started")
             return
         
-        self.is_monitoring = True
-        self.monitor_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
-        self.monitor_thread.start()
+        self._monitoring = True
+        self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self._monitor_thread.start()
+        self.logger.info("Health monitoring started")
     
-    def stop_monitoring(self):
-        """Stop the health monitoring thread."""
-        self.is_monitoring = False
-        if self.monitor_thread:
-            self.monitor_thread.join(timeout=5)
+    def stop_monitoring(self) -> None:
+        """Stop continuous health monitoring."""
+        self._monitoring = False
+        if self._monitor_thread:
+            self._monitor_thread.join(timeout=5.0)
+        self.logger.info("Health monitoring stopped")
     
-    def _monitoring_loop(self):
+    def _monitor_loop(self) -> None:
         """Main monitoring loop."""
-        while self.is_monitoring:
+        while self._monitoring:
             try:
-                # Collect system metrics
-                system_metrics = self._collect_system_metrics()
-                
-                # Collect application metrics
-                app_metrics = self._collect_application_metrics()
-                
-                # Run health checks
-                self._run_health_checks()
-                
-                # Store metrics
-                with self._lock:
-                    self.system_metrics_history.append(system_metrics)
-                    self.app_metrics_history.append(app_metrics)
-                    
-                    # Limit history size
-                    if len(self.system_metrics_history) > self.history_size:
-                        self.system_metrics_history.pop(0)
-                    if len(self.app_metrics_history) > self.history_size:
-                        self.app_metrics_history.pop(0)
-                
+                self.run_health_checks()
                 time.sleep(self.check_interval)
+            except Exception as e:
+                self.logger.error(f"Error in monitoring loop: {str(e)}")
+                time.sleep(self.check_interval)
+    
+    def run_health_checks(self) -> Dict[str, HealthMetric]:
+        """
+        Run all registered health checks.
+        
+        Returns:
+            Dictionary of health check results
+        """
+        results = {}
+        overall_status = HealthStatus.HEALTHY
+        
+        for check_name, check_func in self.health_checks.items():
+            try:
+                metric = check_func()
+                results[check_name] = metric
+                
+                # Update overall status
+                if metric.status.value == "critical":
+                    overall_status = HealthStatus.CRITICAL
+                elif metric.status.value == "warning" and overall_status == HealthStatus.HEALTHY:
+                    overall_status = HealthStatus.WARNING
+                
+                # Store metric
+                with self._lock:
+                    if check_name not in self.metrics:
+                        self.metrics[check_name] = []
+                    self.metrics[check_name].append(metric)
+                    
+                    # Keep only recent metrics (last 1000)
+                    if len(self.metrics[check_name]) > 1000:
+                        self.metrics[check_name] = self.metrics[check_name][-1000:]
                 
             except Exception as e:
-                # Log error but continue monitoring
-                print(f"Health monitoring error: {e}")
-                time.sleep(self.check_interval)
-    
-    def _collect_system_metrics(self) -> SystemMetrics:
-        """Collect system-level metrics."""
-        if not HAS_PSUTIL:
-            return SystemMetrics(
-                cpu_percent=0.0,
-                memory_percent=0.0,
-                memory_available_gb=0.0,
-                disk_usage_percent=0.0,
-                process_memory_mb=0.0,
-                process_cpu_percent=0.0
-            )
-        
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
-        process = psutil.Process()
-        
-        metrics = SystemMetrics(
-            cpu_percent=psutil.cpu_percent(),
-            memory_percent=memory.percent,
-            memory_available_gb=memory.available / 1024 / 1024 / 1024,
-            disk_usage_percent=(disk.used / disk.total) * 100,
-            process_memory_mb=process.memory_info().rss / 1024 / 1024,
-            process_cpu_percent=process.cpu_percent()
-        )
-        
-        # GPU metrics if available
-        if self.enable_gpu_monitoring:
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    metrics.gpu_memory_percent = (
-                        torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated() * 100
-                    )
-                    # Note: GPU utilization requires nvidia-ml-py
-            except ImportError:
-                pass
-        
-        return metrics
-    
-    def _collect_application_metrics(self) -> ApplicationMetrics:
-        """Collect application-specific metrics."""
-        with self._lock:
-            # Calculate average design time
-            design_times = self._app_counters['design_times']
-            avg_design_time = sum(design_times) / len(design_times) if design_times else 0.0
-            
-            # Calculate error rate
-            current_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-            error_rate = self._app_counters['errors_by_hour'].get(current_hour, 0)
-            
-            return ApplicationMetrics(
-                designs_completed=self._app_counters['designs_completed'],
-                validation_errors=self._app_counters['validation_errors'],
-                average_design_time_ms=avg_design_time,
-                active_sessions=len(self._app_counters['active_sessions']),
-                error_rate_per_hour=error_rate
-            )
-    
-    def _run_health_checks(self):
-        """Run all registered health checks."""
-        with self._lock:
-            for name, check_func in self.health_checks.items():
-                try:
-                    metric = check_func()
-                    self.health_metrics[name] = metric
-                except Exception as e:
-                    # Create error metric
-                    self.health_metrics[name] = HealthMetric(
-                        name=name,
-                        value=0.0,
-                        unit="error",
-                        status=HealthStatus.CRITICAL,
-                        description=f"Health check failed: {str(e)}"
-                    )
-    
-    def get_current_health(self) -> Dict[str, Any]:
-        """Get current health status."""
-        with self._lock:
-            # Overall health status
-            statuses = [metric.status for metric in self.health_metrics.values()]
-            if HealthStatus.CRITICAL in statuses:
+                self.logger.error(f"Health check '{check_name}' failed: {str(e)}")
+                error_metric = HealthMetric(
+                    name=check_name,
+                    value=0.0,
+                    status=HealthStatus.CRITICAL,
+                    message=f"Health check failed: {str(e)}"
+                )
+                results[check_name] = error_metric
                 overall_status = HealthStatus.CRITICAL
-            elif HealthStatus.WARNING in statuses:
-                overall_status = HealthStatus.WARNING
-            elif statuses:
-                overall_status = HealthStatus.HEALTHY
-            else:
-                overall_status = HealthStatus.UNKNOWN
-            
-            # Current metrics
-            current_system = self.system_metrics_history[-1] if self.system_metrics_history else None
-            current_app = self.app_metrics_history[-1] if self.app_metrics_history else None
-            
-            return {
-                "overall_status": overall_status.value,
-                "timestamp": datetime.utcnow().isoformat(),
-                "health_metrics": {
-                    name: {
-                        "value": metric.value,
-                        "unit": metric.unit,
-                        "status": metric.status.value,
-                        "description": metric.description
-                    }
-                    for name, metric in self.health_metrics.items()
-                },
-                "system_metrics": current_system.__dict__ if current_system else None,
-                "application_metrics": current_app.__dict__ if current_app else None
-            }
-    
-    def get_health_trends(self, hours: int = 24) -> Dict[str, Any]:
-        """Get health trends over the specified time period."""
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
         
-        with self._lock:
-            # Filter recent metrics
-            recent_system = [
-                m for m in self.system_metrics_history
-                if m.timestamp >= cutoff_time
-            ]
-            recent_app = [
-                m for m in self.app_metrics_history
-                if m.timestamp >= cutoff_time
-            ]
+        self.current_status = overall_status
+        return results
+    
+    def _check_system_resources(self) -> HealthMetric:
+        """Check system resource utilization."""
+        try:
+            # CPU usage
+            cpu_percent = psutil.cpu_percent(interval=1)
             
-            if not recent_system:
-                return {"error": "No recent metrics available"}
+            # Memory usage
+            memory = psutil.virtual_memory()
+            memory_percent = memory.percent
+            memory_available_gb = memory.available / (1024**3)
             
-            # Calculate trends
-            return {
-                "time_period_hours": hours,
-                "system_trends": {
-                    "cpu_usage": {
-                        "avg": sum(m.cpu_percent for m in recent_system) / len(recent_system),
-                        "max": max(m.cpu_percent for m in recent_system),
-                        "min": min(m.cpu_percent for m in recent_system)
-                    },
-                    "memory_usage": {
-                        "avg": sum(m.memory_percent for m in recent_system) / len(recent_system),
-                        "max": max(m.memory_percent for m in recent_system),
-                        "min": min(m.memory_percent for m in recent_system)
+            # Disk usage
+            disk = psutil.disk_usage('/')
+            disk_percent = disk.percent
+            
+            # GPU info
+            gpu_memory_percent = None
+            gpu_utilization = None
+            
+            if torch.cuda.is_available():
+                try:
+                    gpu_memory_used = torch.cuda.memory_allocated()
+                    gpu_memory_total = torch.cuda.max_memory_allocated()
+                    if gpu_memory_total > 0:
+                        gpu_memory_percent = (gpu_memory_used / gpu_memory_total) * 100
+                except:
+                    pass
+            
+            # Store resource snapshot
+            resources = SystemResources(
+                cpu_percent=cpu_percent,
+                memory_percent=memory_percent,
+                memory_available_gb=memory_available_gb,
+                disk_percent=disk_percent,
+                gpu_memory_percent=gpu_memory_percent,
+                gpu_utilization=gpu_utilization
+            )
+            
+            with self._lock:
+                self.resource_history.append(resources)
+                if len(self.resource_history) > 1000:
+                    self.resource_history = self.resource_history[-1000:]
+            
+            # Determine status
+            status = HealthStatus.HEALTHY
+            issues = []
+            
+            if cpu_percent > 90:
+                status = HealthStatus.CRITICAL
+                issues.append(f"CPU usage critical: {cpu_percent:.1f}%")
+            elif cpu_percent > 80:
+                status = HealthStatus.WARNING
+                issues.append(f"CPU usage high: {cpu_percent:.1f}%")
+            
+            if memory_percent > 95:
+                status = HealthStatus.CRITICAL
+                issues.append(f"Memory usage critical: {memory_percent:.1f}%")
+            elif memory_percent > 85:
+                status = HealthStatus.WARNING
+                issues.append(f"Memory usage high: {memory_percent:.1f}%")
+            
+            if disk_percent > 95:
+                status = HealthStatus.CRITICAL
+                issues.append(f"Disk usage critical: {disk_percent:.1f}%")
+            elif disk_percent > 90:
+                status = HealthStatus.WARNING
+                issues.append(f"Disk usage high: {disk_percent:.1f}%")
+            
+            if gpu_memory_percent and gpu_memory_percent > 95:
+                status = HealthStatus.CRITICAL
+                issues.append(f"GPU memory critical: {gpu_memory_percent:.1f}%")
+            
+            message = "System resources normal" if not issues else "; ".join(issues)
+            
+            return HealthMetric(
+                name="system_resources",
+                value=max(cpu_percent, memory_percent, disk_percent),
+                status=status,
+                message=message,
+                metadata=resources.to_dict()
+            )
+            
+        except Exception as e:
+            return HealthMetric(
+                name="system_resources",
+                value=0.0,
+                status=HealthStatus.CRITICAL,
+                message=f"Failed to check system resources: {str(e)}"
+            )
+    
+    def _check_gpu_health(self) -> HealthMetric:
+        """Check GPU health and availability."""
+        try:
+            if not torch.cuda.is_available():
+                return HealthMetric(
+                    name="gpu_health",
+                    value=0.0,
+                    status=HealthStatus.WARNING,
+                    message="CUDA not available - running on CPU only"
+                )
+            
+            # Check GPU accessibility
+            try:
+                device_count = torch.cuda.device_count()
+                current_device = torch.cuda.current_device()
+                device_name = torch.cuda.get_device_name(current_device)
+                
+                # Simple GPU test
+                test_tensor = torch.randn(1000, 1000, device='cuda')
+                result = torch.matmul(test_tensor, test_tensor.T)
+                del test_tensor, result
+                torch.cuda.empty_cache()
+                
+                return HealthMetric(
+                    name="gpu_health",
+                    value=100.0,
+                    status=HealthStatus.HEALTHY,
+                    message=f"GPU healthy: {device_name}",
+                    metadata={
+                        "device_count": device_count,
+                        "current_device": current_device,
+                        "device_name": device_name
                     }
-                },
-                "application_trends": {
-                    "total_designs": sum(m.designs_completed for m in recent_app),
-                    "total_errors": sum(m.validation_errors for m in recent_app),
-                    "avg_design_time": (
-                        sum(m.average_design_time_ms for m in recent_app) / len(recent_app)
-                        if recent_app else 0
-                    )
+                )
+                
+            except Exception as gpu_error:
+                return HealthMetric(
+                    name="gpu_health",
+                    value=0.0,
+                    status=HealthStatus.CRITICAL,
+                    message=f"GPU test failed: {str(gpu_error)}"
+                )
+                
+        except Exception as e:
+            return HealthMetric(
+                name="gpu_health",
+                value=0.0,
+                status=HealthStatus.CRITICAL,
+                message=f"GPU health check failed: {str(e)}"
+            )
+    
+    def _check_operation_performance(self) -> HealthMetric:
+        """Check operation performance trends."""
+        with self._lock:
+            if not self.operation_times:
+                return HealthMetric(
+                    name="operation_performance",
+                    value=100.0,
+                    status=HealthStatus.HEALTHY,
+                    message="No operations recorded yet"
+                )
+            
+            # Calculate average operation times
+            avg_times = {}
+            for op_name, times in self.operation_times.items():
+                if times:
+                    avg_times[op_name] = sum(times) / len(times)
+            
+            # Check for performance degradation
+            status = HealthStatus.HEALTHY
+            issues = []
+            
+            for op_name, avg_time in avg_times.items():
+                if avg_time > 300:  # 5 minutes
+                    status = HealthStatus.CRITICAL
+                    issues.append(f"{op_name}: {avg_time:.1f}s")
+                elif avg_time > 60:  # 1 minute
+                    if status == HealthStatus.HEALTHY:
+                        status = HealthStatus.WARNING
+                    issues.append(f"{op_name}: {avg_time:.1f}s")
+            
+            overall_avg = sum(avg_times.values()) / len(avg_times) if avg_times else 0
+            message = "Performance normal" if not issues else f"Slow operations: {'; '.join(issues)}"
+            
+            return HealthMetric(
+                name="operation_performance",
+                value=100.0 - min(100.0, overall_avg / 10.0),  # Normalize to 0-100
+                status=status,
+                message=message,
+                metadata={"average_times": avg_times}
+            )
+    
+    def _check_error_rates(self) -> HealthMetric:
+        """Check error rates across operations."""
+        with self._lock:
+            total_operations = sum(self.success_counts.values()) + sum(self.error_counts.values())
+            total_errors = sum(self.error_counts.values())
+            
+            if total_operations == 0:
+                return HealthMetric(
+                    name="error_rates",
+                    value=100.0,
+                    status=HealthStatus.HEALTHY,
+                    message="No operations recorded"
+                )
+            
+            error_rate = (total_errors / total_operations) * 100
+            
+            status = HealthStatus.HEALTHY
+            if error_rate > 50:
+                status = HealthStatus.CRITICAL
+            elif error_rate > 20:
+                status = HealthStatus.WARNING
+            
+            message = f"Error rate: {error_rate:.1f}% ({total_errors}/{total_operations})"
+            
+            return HealthMetric(
+                name="error_rates",
+                value=100.0 - error_rate,
+                status=status,
+                message=message,
+                metadata={
+                    "total_operations": total_operations,
+                    "total_errors": total_errors,
+                    "error_rate": error_rate
+                }
+            )
+    
+    def _check_memory_leaks(self) -> HealthMetric:
+        """Check for potential memory leaks."""
+        try:
+            # Check memory trend over time
+            if len(self.resource_history) < 10:
+                return HealthMetric(
+                    name="memory_leaks",
+                    value=100.0,
+                    status=HealthStatus.HEALTHY,
+                    message="Insufficient data for leak detection"
+                )
+            
+            # Calculate memory trend (last 10 measurements)
+            recent_memory = [r.memory_percent for r in self.resource_history[-10:]]
+            memory_trend = recent_memory[-1] - recent_memory[0]
+            
+            status = HealthStatus.HEALTHY
+            message = f"Memory trend: {memory_trend:+.1f}%"
+            
+            if memory_trend > 20:  # 20% increase
+                status = HealthStatus.CRITICAL
+                message = f"Potential memory leak detected: {memory_trend:+.1f}% increase"
+            elif memory_trend > 10:  # 10% increase
+                status = HealthStatus.WARNING
+                message = f"Memory usage increasing: {memory_trend:+.1f}%"
+            
+            return HealthMetric(
+                name="memory_leaks",
+                value=100.0 - max(0, memory_trend * 5),  # Normalize
+                status=status,
+                message=message,
+                metadata={"memory_trend": memory_trend}
+            )
+            
+        except Exception as e:
+            return HealthMetric(
+                name="memory_leaks",
+                value=0.0,
+                status=HealthStatus.CRITICAL,
+                message=f"Memory leak check failed: {str(e)}"
+            )
+    
+    def record_operation(self, operation_name: str, duration: float, success: bool = True) -> None:
+        """
+        Record operation performance data.
+        
+        Args:
+            operation_name: Name of the operation
+            duration: Operation duration in seconds
+            success: Whether the operation succeeded
+        """
+        with self._lock:
+            # Record timing
+            if operation_name not in self.operation_times:
+                self.operation_times[operation_name] = []
+            self.operation_times[operation_name].append(duration)
+            
+            # Keep only recent timings
+            if len(self.operation_times[operation_name]) > 100:
+                self.operation_times[operation_name] = self.operation_times[operation_name][-100:]
+            
+            # Record success/failure
+            if success:
+                self.success_counts[operation_name] = self.success_counts.get(operation_name, 0) + 1
+            else:
+                self.error_counts[operation_name] = self.error_counts.get(operation_name, 0) + 1
+    
+    def get_health_summary(self) -> Dict[str, Any]:
+        """
+        Get comprehensive health summary.
+        
+        Returns:
+            Dictionary with health status and metrics
+        """
+        with self._lock:
+            latest_metrics = {}
+            for check_name, metrics in self.metrics.items():
+                if metrics:
+                    latest_metrics[check_name] = metrics[-1]
+            
+            return {
+                "overall_status": self.current_status.value,
+                "last_check": time.time(),
+                "metrics": {name: metric.__dict__ for name, metric in latest_metrics.items()},
+                "system_resources": self.resource_history[-1].to_dict() if self.resource_history else None,
+                "operation_stats": {
+                    "total_success": sum(self.success_counts.values()),
+                    "total_errors": sum(self.error_counts.values()),
+                    "operations_tracked": len(self.operation_times)
                 }
             }
     
-    def record_design_completion(self, duration_ms: float):
-        """Record a completed protein design."""
-        with self._lock:
-            self._app_counters['designs_completed'] += 1
-            self._app_counters['design_times'].append(duration_ms)
+    def get_recommendations(self) -> List[str]:
+        """
+        Get health improvement recommendations.
+        
+        Returns:
+            List of recommended actions
+        """
+        recommendations = []
+        
+        try:
+            summary = self.get_health_summary()
             
-            # Keep only recent design times (last 100)
-            if len(self._app_counters['design_times']) > 100:
-                self._app_counters['design_times'].pop(0)
-    
-    def record_validation_error(self):
-        """Record a validation error."""
-        with self._lock:
-            self._app_counters['validation_errors'] += 1
+            # Check resource issues
+            if summary["system_resources"]:
+                resources = summary["system_resources"]
+                
+                if resources["memory_percent"] > 85:
+                    recommendations.append("Consider increasing system memory or optimizing memory usage")
+                
+                if resources["cpu_percent"] > 80:
+                    recommendations.append("CPU usage is high - consider load balancing or optimization")
+                
+                if resources["disk_percent"] > 90:
+                    recommendations.append("Disk space is low - clean up temporary files or increase storage")
             
-            # Track errors by hour
-            current_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-            self._app_counters['errors_by_hour'][current_hour] = (
-                self._app_counters['errors_by_hour'].get(current_hour, 0) + 1
-            )
-    
-    def record_session_start(self, session_id: str):
-        """Record the start of a user session."""
-        with self._lock:
-            self._app_counters['active_sessions'].add(session_id)
-    
-    def record_session_end(self, session_id: str):
-        """Record the end of a user session."""
-        with self._lock:
-            self._app_counters['active_sessions'].discard(session_id)
-    
-    def export_metrics(self, filepath: Path, format: str = "json"):
-        """Export metrics to file."""
-        data = {
-            "export_timestamp": datetime.utcnow().isoformat(),
-            "current_health": self.get_current_health(),
-            "trends_24h": self.get_health_trends(24),
-            "system_metrics_history": [
-                m.__dict__ for m in self.system_metrics_history
-            ],
-            "application_metrics_history": [
-                m.__dict__ for m in self.app_metrics_history
-            ]
-        }
-        
-        if format.lower() == "json":
-            with open(filepath, 'w') as f:
-                json.dump(data, f, indent=2, default=str)
-        else:
-            raise ValueError(f"Unsupported export format: {format}")
-    
-    def create_health_report(self) -> str:
-        """Create a human-readable health report."""
-        health = self.get_current_health()
-        trends = self.get_health_trends(24)
-        
-        report = []
-        report.append("=== Protein Operators Health Report ===")
-        report.append(f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
-        report.append(f"Overall Status: {health['overall_status'].upper()}")
-        report.append("")
-        
-        # Health metrics
-        report.append("Health Metrics:")
-        for name, metric in health['health_metrics'].items():
-            status_emoji = {
-                'healthy': '✅',
-                'warning': '⚠️',
-                'critical': '❌',
-                'unknown': '❓'
-            }.get(metric['status'], '❓')
+            # Check error rates
+            stats = summary["operation_stats"]
+            total_ops = stats["total_success"] + stats["total_errors"]
+            if total_ops > 0:
+                error_rate = (stats["total_errors"] / total_ops) * 100
+                if error_rate > 20:
+                    recommendations.append("High error rate detected - review error logs and improve error handling")
             
-            report.append(f"  {status_emoji} {name}: {metric['value']:.1f}{metric['unit']} ({metric['status']})")
+            # Check GPU status
+            metrics = summary["metrics"]
+            if "gpu_health" in metrics:
+                gpu_metric = metrics["gpu_health"]
+                if gpu_metric["status"] == "warning":
+                    recommendations.append("GPU not available - consider enabling CUDA support for better performance")
+                elif gpu_metric["status"] == "critical":
+                    recommendations.append("GPU issues detected - check CUDA installation and GPU drivers")
+            
+            if not recommendations:
+                recommendations.append("System is running optimally - no recommendations at this time")
+                
+        except Exception as e:
+            recommendations.append(f"Unable to generate recommendations due to error: {str(e)}")
         
-        report.append("")
-        
-        # System metrics
-        if health['system_metrics']:
-            sm = health['system_metrics']
-            report.append("Current System Metrics:")
-            report.append(f"  CPU Usage: {sm['cpu_percent']:.1f}%")
-            report.append(f"  Memory Usage: {sm['memory_percent']:.1f}% ({sm['memory_available_gb']:.1f}GB available)")
-            report.append(f"  Disk Usage: {sm['disk_usage_percent']:.1f}%")
-            report.append(f"  Process Memory: {sm['process_memory_mb']:.1f}MB")
-            if sm.get('gpu_memory_percent'):
-                report.append(f"  GPU Memory: {sm['gpu_memory_percent']:.1f}%")
-        
-        report.append("")
-        
-        # Application metrics
-        if health['application_metrics']:
-            am = health['application_metrics']
-            report.append("Application Metrics:")
-            report.append(f"  Designs Completed: {am['designs_completed']}")
-            report.append(f"  Validation Errors: {am['validation_errors']}")
-            report.append(f"  Average Design Time: {am['average_design_time_ms']:.1f}ms")
-            report.append(f"  Active Sessions: {am['active_sessions']}")
-        
-        report.append("")
-        
-        # 24-hour trends
-        if 'system_trends' in trends:
-            st = trends['system_trends']
-            report.append("24-Hour Trends:")
-            report.append(f"  CPU Usage: {st['cpu_usage']['avg']:.1f}% avg, {st['cpu_usage']['max']:.1f}% max")
-            report.append(f"  Memory Usage: {st['memory_usage']['avg']:.1f}% avg, {st['memory_usage']['max']:.1f}% max")
-        
-        return "\\n".join(report)
+        return recommendations
+
 
 # Global health monitor instance
 _global_health_monitor: Optional[HealthMonitor] = None
+
 
 def get_health_monitor() -> HealthMonitor:
     """Get the global health monitor instance."""
@@ -576,17 +564,20 @@ def get_health_monitor() -> HealthMonitor:
         _global_health_monitor = HealthMonitor()
     return _global_health_monitor
 
-def start_health_monitoring():
+
+def start_health_monitoring() -> None:
     """Start global health monitoring."""
     monitor = get_health_monitor()
     monitor.start_monitoring()
 
-def stop_health_monitoring():
+
+def stop_health_monitoring() -> None:
     """Stop global health monitoring."""
     monitor = get_health_monitor()
     monitor.stop_monitoring()
 
-def get_health_status() -> Dict[str, Any]:
-    """Get current health status."""
+
+def record_operation_performance(operation_name: str, duration: float, success: bool = True) -> None:
+    """Record operation performance in global monitor."""
     monitor = get_health_monitor()
-    return monitor.get_current_health()
+    monitor.record_operation(operation_name, duration, success)
