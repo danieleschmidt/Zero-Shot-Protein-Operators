@@ -578,15 +578,16 @@ def _fallback_constraint_encoding(*args, **kwargs):
     # Return zero tensor as fallback
     try:
         import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
-try:
-    import torch
-except ImportError:
-    import mock_torch as torch
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+        import torch
         return torch.zeros(10)
     except ImportError:
-        return [0.0] * 10
+        try:
+            import mock_torch as torch
+            return torch.zeros(10)
+        except ImportError:
+            return [0.0] * 10
 
 
 def _fallback_coordinate_generation(*args, **kwargs):
