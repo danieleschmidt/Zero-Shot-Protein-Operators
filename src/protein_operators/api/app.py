@@ -133,4 +133,134 @@ def create_app(
     app.include_router(router, prefix="/api/v1")
     
     # Root endpoint
-    @app.get("/", tags=["Root"])\n    async def root():\n        \"\"\"Root endpoint with API information.\"\"\"\n        return {\n            \"name\": title,\n            \"version\": version,\n            \"description\": description,\n            \"docs\": \"/docs\" if debug else \"Documentation available in debug mode\",\n            \"status\": \"healthy\"\n        }\n    \n    # Health check endpoint\n    @app.get(\"/health\", tags=[\"Health\"])\n    async def health_check():\n        \"\"\"Health check endpoint.\"\"\"\n        try:\n            # Check database connection\n            db = get_database()\n            with db.session() as session:\n                session.execute(\"SELECT 1\")\n            \n            return {\n                \"status\": \"healthy\",\n                \"database\": \"connected\",\n                \"api\": \"operational\"\n            }\n        \n        except Exception as e:\n            logger.error(f\"Health check failed: {e}\")\n            return JSONResponse(\n                status_code=503,\n                content={\n                    \"status\": \"unhealthy\",\n                    \"error\": str(e)\n                }\n            )\n    \n    # Global exception handlers\n    @app.exception_handler(RequestValidationError)\n    async def validation_exception_handler(request: Request, exc: RequestValidationError):\n        \"\"\"Handle request validation errors.\"\"\"\n        logger.warning(f\"Validation error for {request.url}: {exc}\")\n        \n        return JSONResponse(\n            status_code=422,\n            content=ErrorResponse(\n                error=\"Validation Error\",\n                message=\"Request validation failed\",\n                details=exc.errors()\n            ).dict()\n        )\n    \n    @app.exception_handler(HTTPException)\n    async def http_exception_handler(request: Request, exc: HTTPException):\n        \"\"\"Handle HTTP exceptions.\"\"\"\n        logger.warning(f\"HTTP error {exc.status_code} for {request.url}: {exc.detail}\")\n        \n        return JSONResponse(\n            status_code=exc.status_code,\n            content=ErrorResponse(\n                error=f\"HTTP {exc.status_code}\",\n                message=exc.detail\n            ).dict()\n        )\n    \n    @app.exception_handler(Exception)\n    async def general_exception_handler(request: Request, exc: Exception):\n        \"\"\"Handle general exceptions.\"\"\"\n        logger.error(f\"Unhandled error for {request.url}: {exc}\", exc_info=True)\n        \n        return JSONResponse(\n            status_code=500,\n            content=ErrorResponse(\n                error=\"Internal Server Error\",\n                message=\"An unexpected error occurred\"\n            ).dict()\n        )\n    \n    return app\n\n\ndef get_app() -> FastAPI:\n    \"\"\"Get or create global application instance.\"\"\"\n    global _app_instance\n    \n    if _app_instance is None:\n        _app_instance = create_app(\n            debug=os.getenv(\"DEBUG\", \"false\").lower() == \"true\"\n        )\n    \n    return _app_instance\n\n\ndef run_server(\n    host: str = \"0.0.0.0\",\n    port: int = 8000,\n    reload: bool = False,\n    workers: int = 1,\n    **kwargs\n):\n    \"\"\"Run the API server with uvicorn.\"\"\"\n    \n    # Get configuration from environment\n    host = os.getenv(\"API_HOST\", host)\n    port = int(os.getenv(\"API_PORT\", port))\n    workers = int(os.getenv(\"API_WORKERS\", workers))\n    reload = os.getenv(\"API_RELOAD\", str(reload)).lower() == \"true\"\n    \n    logger.info(f\"Starting server on {host}:{port} with {workers} workers\")\n    \n    # Configure uvicorn\n    config = {\n        \"app\": \"protein_operators.api.app:get_app\",\n        \"factory\": True,\n        \"host\": host,\n        \"port\": port,\n        \"reload\": reload,\n        \"access_log\": True,\n        \"log_level\": \"info\",\n        **kwargs\n    }\n    \n    if workers > 1 and not reload:\n        config[\"workers\"] = workers\n    \n    uvicorn.run(**config)\n\n\nif __name__ == \"__main__\":\n    # Run server if script is executed directly\n    run_server(reload=True)"
+    @app.get("/", tags=["Root"])
+    async def root():
+        """Root endpoint with API information."""
+        return {
+            "name": title,
+            "version": version,
+            "description": description,
+            "docs": "/docs" if debug else "Documentation available in debug mode",
+            "status": "healthy"
+        }
+    
+    # Health check endpoint
+    @app.get("/health", tags=["Health"])
+    async def health_check():
+        """Health check endpoint."""
+        try:
+            # Check database connection
+            db = get_database()
+            with db.session() as session:
+                session.execute("SELECT 1")
+            
+            return {
+                "status": "healthy",
+                "database": "connected",
+                "api": "operational"
+            }
+        
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unhealthy",
+                    "error": str(e)
+                }
+            )
+    
+    # Global exception handlers
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """Handle request validation errors."""
+        logger.warning(f"Validation error for {request.url}: {exc}")
+        
+        return JSONResponse(
+            status_code=422,
+            content=ErrorResponse(
+                error="Validation Error",
+                message="Request validation failed",
+                details=exc.errors()
+            ).dict()
+        )
+    
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """Handle HTTP exceptions."""
+        logger.warning(f"HTTP error {exc.status_code} for {request.url}: {exc.detail}")
+        
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=ErrorResponse(
+                error=f"HTTP {exc.status_code}",
+                message=exc.detail
+            ).dict()
+        )
+    
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception):
+        """Handle general exceptions."""
+        logger.error(f"Unhandled error for {request.url}: {exc}", exc_info=True)
+        
+        return JSONResponse(
+            status_code=500,
+            content=ErrorResponse(
+                error="Internal Server Error",
+                message="An unexpected error occurred"
+            ).dict()
+        )
+    
+    return app
+
+
+def get_app() -> FastAPI:
+    """Get or create global application instance."""
+    global _app_instance
+    
+    if _app_instance is None:
+        _app_instance = create_app(
+            debug=os.getenv("DEBUG", "false").lower() == "true"
+        )
+    
+    return _app_instance
+
+
+def run_server(
+    host: str = "0.0.0.0",
+    port: int = 8000,
+    reload: bool = False,
+    workers: int = 1,
+    **kwargs
+):
+    """Run the API server with uvicorn."""
+    
+    # Get configuration from environment
+    host = os.getenv("API_HOST", host)
+    port = int(os.getenv("API_PORT", port))
+    workers = int(os.getenv("API_WORKERS", workers))
+    reload = os.getenv("API_RELOAD", str(reload)).lower() == "true"
+    
+    logger.info(f"Starting server on {host}:{port} with {workers} workers")
+    
+    # Configure uvicorn
+    config = {
+        "app": "protein_operators.api.app:get_app",
+        "factory": True,
+        "host": host,
+        "port": port,
+        "reload": reload,
+        "access_log": True,
+        "log_level": "info",
+        **kwargs
+    }
+    
+    if workers > 1 and not reload:
+        config["workers"] = workers
+    
+    uvicorn.run(**config)
+
+
+if __name__ == "__main__":
+    # Run server if script is executed directly
+    run_server(reload=True)

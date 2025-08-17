@@ -15,14 +15,17 @@ from typing import Dict, List, Any, Optional, Tuple, Union, Callable
 from dataclasses import dataclass, asdict
 from pathlib import Path
 import logging
+import warnings
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../..'))
 try:
     import torch
     import torch.nn as nn
+    import torch.nn.functional as F
 except ImportError:
     import mock_torch as torch
     nn = torch.nn
+    F = torch.nn.functional
 
 from .metrics import ProteinStructureMetrics, PhysicsMetrics, BiochemicalMetrics
 from .datasets import ProteinBenchmarkDatasets
