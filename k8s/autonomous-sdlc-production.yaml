@@ -1,0 +1,625 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: protein-operators-prod
+  labels:
+    app: protein-operators
+    environment: production
+    managed-by: autonomous-sdlc
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: protein-operators-config
+  namespace: protein-operators-prod
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  CACHE_SIZE_MB: "2048"
+  MAX_CONCURRENT_DESIGNS: "10"
+  ENABLE_MONITORING: "true"
+  ENABLE_SECURITY: "true"
+  ENABLE_DISTRIBUTED: "true"
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "protein_operators"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  PROMETHEUS_PORT: "9090"
+  GRAFANA_PORT: "3000"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: protein-operators-secrets
+  namespace: protein-operators-prod
+type: Opaque
+data:
+  POSTGRES_USER: cHJvdGVpbl9vcGVyYXRvcnM=  # protein_operators
+  POSTGRES_PASSWORD: cHJvZF9wYXNzd29yZF8yMDI1  # prod_password_2025
+  REDIS_PASSWORD: cmVkaXNfcHJvZF8yMDI1  # redis_prod_2025
+  JWT_SECRET: and0X3NlY3JldF9wcm9kXzIwMjU=  # jwt_secret_prod_2025
+  API_KEY: YXBpX2tleV9wcm9kXzIwMjU=  # api_key_prod_2025
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: protein-operators-api
+  namespace: protein-operators-prod
+  labels:
+    app: protein-operators
+    component: api
+    environment: production
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: api
+  template:
+    metadata:
+      labels:
+        app: protein-operators
+        component: api
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: protein-operators-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: api
+        image: protein-operators:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: PORT
+          value: "8000"
+        envFrom:
+        - configMapRef:
+            name: protein-operators-config
+        - secretRef:
+            name: protein-operators-secrets
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: cache-volume
+          mountPath: /app/cache
+        - name: models-volume
+          mountPath: /app/models
+        - name: logs-volume
+          mountPath: /app/logs
+      volumes:
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: protein-operators-cache-pvc
+      - name: models-volume
+        persistentVolumeClaim:
+          claimName: protein-operators-models-pvc
+      - name: logs-volume
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: protein-operators-worker
+  namespace: protein-operators-prod
+  labels:
+    app: protein-operators
+    component: worker
+    environment: production
+spec:
+  replicas: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: protein-operators
+        component: worker
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+    spec:
+      serviceAccountName: protein-operators-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: worker
+        image: protein-operators:latest
+        imagePullPolicy: Always
+        command: ["python", "-m", "protein_operators.worker"]
+        ports:
+        - containerPort: 9091
+          name: metrics
+        env:
+        - name: WORKER_TYPE
+          value: "design"
+        - name: MAX_CONCURRENT_TASKS
+          value: "4"
+        envFrom:
+        - configMapRef:
+            name: protein-operators-config
+        - secretRef:
+            name: protein-operators-secrets
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+            nvidia.com/gpu: "1"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: "1"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys; sys.exit(0)"
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        volumeMounts:
+        - name: cache-volume
+          mountPath: /app/cache
+        - name: models-volume
+          mountPath: /app/models
+        - name: temp-volume
+          mountPath: /tmp
+      volumes:
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: protein-operators-cache-pvc
+      - name: models-volume
+        persistentVolumeClaim:
+          claimName: protein-operators-models-pvc
+      - name: temp-volume
+        emptyDir:
+          sizeLimit: 10Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: protein-operators-coordinator
+  namespace: protein-operators-prod
+  labels:
+    app: protein-operators
+    component: coordinator
+    environment: production
+spec:
+  replicas: 2  # High availability
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: coordinator
+  template:
+    metadata:
+      labels:
+        app: protein-operators
+        component: coordinator
+        environment: production
+    spec:
+      serviceAccountName: protein-operators-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: coordinator
+        image: protein-operators:latest
+        imagePullPolicy: Always
+        command: ["python", "-m", "protein_operators.coordinator"]
+        ports:
+        - containerPort: 8080
+          name: coordination
+        - containerPort: 9092
+          name: metrics
+        env:
+        - name: COORDINATOR_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: COORDINATOR_PORT
+          value: "8080"
+        envFrom:
+        - configMapRef:
+            name: protein-operators-config
+        - secretRef:
+            name: protein-operators-secrets
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: protein-operators-api-service
+  namespace: protein-operators-prod
+  labels:
+    app: protein-operators
+    component: api
+spec:
+  selector:
+    app: protein-operators
+    component: api
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: protein-operators-coordinator-service
+  namespace: protein-operators-prod
+  labels:
+    app: protein-operators
+    component: coordinator
+spec:
+  selector:
+    app: protein-operators
+    component: coordinator
+  ports:
+  - name: coordination
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9092
+    targetPort: 9092
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: protein-operators-workers-service
+  namespace: protein-operators-prod
+  labels:
+    app: protein-operators
+    component: worker
+spec:
+  selector:
+    app: protein-operators
+    component: worker
+  ports:
+  - name: metrics
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  type: ClusterIP
+  clusterIP: None  # Headless service for workers
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: protein-operators-ingress
+  namespace: protein-operators-prod
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - api.protein-operators.com
+    secretName: protein-operators-tls
+  rules:
+  - host: api.protein-operators.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: protein-operators-api-service
+            port:
+              number: 80
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: protein-operators-cache-pvc
+  namespace: protein-operators-prod
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: protein-operators-models-pvc
+  namespace: protein-operators-prod
+spec:
+  accessModes:
+  - ReadOnlyMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: protein-operators-api-hpa
+  namespace: protein-operators-prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: protein-operators-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: protein-operators-worker-hpa
+  namespace: protein-operators-prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: protein-operators-worker
+  minReplicas: 5
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: protein-operators-sa
+  namespace: protein-operators-prod
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: protein-operators-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: protein-operators-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: protein-operators-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: protein-operators-sa
+  namespace: protein-operators-prod
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: protein-operators-api-pdb
+  namespace: protein-operators-prod
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: protein-operators-worker-pdb
+  namespace: protein-operators-prod
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: worker
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: protein-operators-network-policy
+  namespace: protein-operators-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: protein-operators
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9091
+    - protocol: TCP
+      port: 9092
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+  - to: []  # Allow external connections for model downloads, etc.
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
