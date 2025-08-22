@@ -15,13 +15,22 @@ class MockTensor:
     
     def __init__(self, data, dtype=None, device=None, requires_grad=False):
         if isinstance(data, (list, tuple)):
-            self.data = np.array(data, dtype=dtype or np.float32)
-        elif isinstance(data, np.ndarray):
-            self.data = data.astype(dtype or np.float32)
+            try:
+                self.data = np.array(data, dtype=dtype or np.float32)
+            except:
+                self.data = data  # Fallback for mock environments
+        elif hasattr(data, 'shape'):  # numpy-like array
+            try:
+                self.data = data.astype(dtype or np.float32)
+            except:
+                self.data = data
         elif isinstance(data, MockTensor):
-            self.data = data.data.copy()
+            self.data = data.data.copy() if hasattr(data.data, 'copy') else data.data
         else:
-            self.data = np.array(data, dtype=dtype or np.float32)
+            try:
+                self.data = np.array(data, dtype=dtype or np.float32)
+            except:
+                self.data = data
         
         self.dtype = dtype or np.float32
         self.device = device or 'cpu'
@@ -48,8 +57,28 @@ class MockTensor:
     
     def __sub__(self, other):
         if isinstance(other, MockTensor):
-            return MockTensor(self.data - other.data)
-        return MockTensor(self.data - other)
+            try:
+                return MockTensor(self.data - other.data)
+            except TypeError:
+                # Handle mock_numpy arrays
+                if hasattr(self.data, 'data') and hasattr(other.data, 'data'):
+                    result = [a - b for a, b in zip(self.data.data, other.data.data)]
+                    return MockTensor(result)
+                else:
+                    return MockTensor([a - b for a, b in zip(self.data, other.data)])
+        else:
+            # Scalar subtraction
+            try:
+                return MockTensor(self.data - other)
+            except TypeError:
+                if hasattr(self.data, 'data'):
+                    result = [x - other for x in self.data.data]
+                    return MockTensor(result)
+                elif isinstance(self.data, list):
+                    result = [x - other for x in self.data]
+                    return MockTensor(result)
+                else:
+                    return MockTensor(self.data - other)
     
     def __mul__(self, other):
         if isinstance(other, MockTensor):
@@ -63,6 +92,15 @@ class MockTensor:
     
     def __pow__(self, other):
         return MockTensor(self.data ** other)
+    
+    def __neg__(self):
+        """Unary negation."""
+        if isinstance(self.data, list):
+            return MockTensor([-x for x in self.data])
+        elif hasattr(self.data, 'data') and isinstance(self.data.data, list):
+            return MockTensor([-x for x in self.data.data])
+        else:
+            return MockTensor(-self.data)
     
     def __getitem__(self, key):
         return MockTensor(self.data[key])
@@ -247,7 +285,18 @@ def cdist(x1, x2):
         for p1 in data1:
             row = []
             for p2 in data2:
-                dist = sum((a - b)**2 for a, b in zip(p1, p2))**0.5
+                # Handle mock arrays better
+                if hasattr(p1, 'data'):
+                    p1_vals = p1.data if isinstance(p1.data, list) else [p1.data]
+                else:
+                    p1_vals = p1 if isinstance(p1, list) else [p1]
+                
+                if hasattr(p2, 'data'):
+                    p2_vals = p2.data if isinstance(p2.data, list) else [p2.data]
+                else:
+                    p2_vals = p2 if isinstance(p2, list) else [p2]
+                
+                dist = sum((a - b)**2 for a, b in zip(p1_vals, p2_vals))**0.5
                 row.append(dist)
             distances.append(row)
         
@@ -266,7 +315,38 @@ def dot(input, other):
 
 def norm(input, dim=None):
     """Compute norm."""
-    return MockTensor(np.linalg.norm(input.data, axis=dim))
+    if isinstance(input, MockTensor):
+        data = input.data
+    else:
+        data = input
+    
+    try:
+        return MockTensor(np.linalg.norm(data, axis=dim))
+    except:
+        # Fallback for mock arrays
+        if isinstance(data, list):
+            if dim == -1 or dim == 1:  # Row-wise norm
+                result = []
+                for row in data:
+                    if isinstance(row, list):
+                        row_norm = sum(x**2 for x in row) ** 0.5
+                        result.append(row_norm)
+                    else:
+                        result.append(abs(row))
+                return MockTensor(result)
+            else:
+                # Overall norm
+                flat_data = []
+                def flatten(x):
+                    if isinstance(x, list):
+                        for item in x:
+                            flatten(item)
+                    else:
+                        flat_data.append(x)
+                flatten(data)
+                norm_val = sum(x**2 for x in flat_data) ** 0.5
+                return MockTensor(norm_val)
+        return MockTensor(abs(data))
 
 
 def exp(input):
@@ -297,6 +377,21 @@ def cos(input):
 def sqrt(input):
     """Element-wise square root."""
     return MockTensor(np.sqrt(input.data))
+
+
+def abs(input):
+    """Element-wise absolute value."""
+    if isinstance(input, MockTensor):
+        data = input.data
+    else:
+        data = input
+    
+    if isinstance(data, list):
+        return MockTensor([__builtins__['abs'](x) for x in data])
+    elif hasattr(data, 'data') and isinstance(data.data, list):
+        return MockTensor([__builtins__['abs'](x) for x in data.data])
+    else:
+        return MockTensor(__builtins__['abs'](data))
 
 
 def argmax(input, dim=None):
