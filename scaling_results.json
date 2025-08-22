@@ -1,0 +1,114 @@
+{
+  "timestamp": "2025-08-22 18:55:12",
+  "framework": "Scalable Autonomous Protein Design - Generation 3",
+  "benchmark_results": {
+    "\ud83d\ude80 Single Request Performance": {
+      "success": false,
+      "error": "Object of type Constraints is not JSON serializable",
+      "execution_time": 0
+    },
+    "\ud83d\udcca Batch Processing Efficiency": {
+      "success": false,
+      "error": "Object of type Constraints is not JSON serializable",
+      "execution_time": 0
+    },
+    "\ud83c\udfaf Cache Performance": {
+      "success": false,
+      "error": "Object of type Constraints is not JSON serializable",
+      "execution_time": 0
+    },
+    "\u2696\ufe0f Load Balancing": {
+      "workers_available": 3,
+      "total_selections": 20,
+      "selection_distribution": {
+        "worker_1": 7,
+        "worker_2": 7,
+        "worker_3": 6
+      },
+      "load_balancing_active": true,
+      "execution_time": 9.560585021972656e-05
+    },
+    "\ud83d\udcc8 Throughput Scaling": {
+      "success": false,
+      "error": "Object of type Constraints is not JSON serializable",
+      "execution_time": 0
+    },
+    "\ud83d\udd04 Auto-scaling Behavior": {
+      "initial_workers": 0,
+      "scale_up_triggered": true,
+      "scale_up_reason": "High utilization (90.0%) or queue backlog (15)",
+      "scale_down_triggered": true,
+      "scale_down_reason": "Low utilization (10.0%)",
+      "auto_scaling_responsive": true,
+      "execution_time": 7.033348083496094e-05
+    }
+  },
+  "performance_metrics": {
+    "metrics": {
+      "total_requests": 0,
+      "processed_requests": 0,
+      "queued_requests": 0,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "batch_efficiency": 0.0,
+      "avg_processing_time": 0.0,
+      "throughput_per_second": 0.0,
+      "resource_utilization": 0.0
+    },
+    "cache_stats": {
+      "size": 0,
+      "max_size": 10000,
+      "hit_ratio": 0.0,
+      "strategy": "lru"
+    },
+    "resource_stats": {
+      "active_allocations": 0,
+      "utilization": 0.0,
+      "available_memory": 4096,
+      "available_gpu_memory": 8192
+    },
+    "load_balancer_stats": {
+      "total_workers": 3,
+      "healthy_workers": 3,
+      "strategy": "round_robin",
+      "worker_stats": [
+        {
+          "id": "worker_1",
+          "capacity": 1.0,
+          "active_requests": 0,
+          "total_requests": 0,
+          "avg_response_time": 0.0,
+          "health_status": "healthy"
+        },
+        {
+          "id": "worker_2",
+          "capacity": 1.5,
+          "active_requests": 0,
+          "total_requests": 0,
+          "avg_response_time": 0.0,
+          "health_status": "healthy"
+        },
+        {
+          "id": "worker_3",
+          "capacity": 0.8,
+          "active_requests": 0,
+          "total_requests": 0,
+          "avg_response_time": 0.0,
+          "health_status": "healthy"
+        }
+      ]
+    },
+    "timestamp": "2025-08-22T18:55:12.623248"
+  },
+  "system_info": {
+    "caching_enabled": true,
+    "batching_enabled": true,
+    "auto_scaling_enabled": true,
+    "load_balancing_enabled": true
+  },
+  "summary": {
+    "total_benchmarks": 6,
+    "successful_benchmarks": 2,
+    "failed_benchmarks": 4
+  }
+}

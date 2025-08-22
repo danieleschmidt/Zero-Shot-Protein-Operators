@@ -445,7 +445,10 @@ class linalg:
             data = [x]
         
         if isinstance(data, (list, tuple)):
-            return (sum(val ** 2 for val in data)) ** 0.5
+            squared_sum = 0
+            for val in data:
+                squared_sum += val ** 2
+            return squared_sum ** 0.5
         return abs(data)
     
     @staticmethod
