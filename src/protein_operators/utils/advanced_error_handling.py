@@ -15,6 +15,8 @@ import logging
 import traceback
 import sys
 import os
+import random
+import asyncio
 from typing import Any, Dict, List, Optional, Callable, Type, Union
 from enum import Enum
 from dataclasses import dataclass, field
@@ -79,6 +81,25 @@ class CircuitBreakerState:
     last_failure_time: Optional[datetime] = None
     state: str = "closed"  # closed, open, half-open
     success_count: int = 0
+
+
+class ProteinDesignException(Exception):
+    """Base exception for protein design errors with enhanced context."""
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None, suggestion: Optional[str] = None):
+        super().__init__(message)
+        self.context = context or {}
+        self.suggestion = suggestion
+        self.timestamp = time.time()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert exception to dictionary for logging/serialization."""
+        return {
+            'type': self.__class__.__name__,
+            'message': str(self),
+            'context': self.context,
+            'suggestion': self.suggestion,
+            'timestamp': self.timestamp
+        }
 
 
 class CircuitBreakerError(Exception):
@@ -593,6 +614,93 @@ def circuit_breaker(
                 error_handler_instance.record_failure(operation_name)
                 raise e
         return wrapper
+    return decorator
+
+
+def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 60.0, 
+                      exponential_base: float = 2.0, jitter: bool = True):
+    """
+    Enhanced retry decorator with exponential backoff and jitter.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay in seconds
+        max_delay: Maximum delay in seconds
+        exponential_base: Base for exponential backoff
+        jitter: Whether to add jitter to prevent thundering herd
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            logger = logging.getLogger(__name__)
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    if asyncio.iscoroutinefunction(func):
+                        return await func(*args, **kwargs)
+                    else:
+                        return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_retries:
+                        logger.error(f"All {max_retries + 1} attempts failed for {func.__name__}")
+                        raise e
+                    
+                    # Enhanced backoff with jitter to prevent thundering herd
+                    delay = min(base_delay * (exponential_base ** attempt), max_delay)
+                    if jitter:
+                        delay *= (0.5 + random.random() * 0.5)  # Add 50% jitter
+                    
+                    logger.warning(f"Attempt {attempt + 1}/{max_retries} failed, retrying in {delay:.2f}s: {e}")
+                    
+                    # Add attempt context to exception if it's a ProteinDesignException
+                    if isinstance(e, ProteinDesignException):
+                        e.context.setdefault('retry_attempts', []).append({
+                            'attempt': attempt + 1,
+                            'delay': delay,
+                            'error': str(e)
+                        })
+                    
+                    await asyncio.sleep(delay)
+            
+            return None  # Should not reach here
+        
+        @functools.wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            logger = logging.getLogger(__name__)
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_retries:
+                        logger.error(f"All {max_retries + 1} attempts failed for {func.__name__}")
+                        raise e
+                    
+                    # Enhanced backoff with jitter to prevent thundering herd
+                    delay = min(base_delay * (exponential_base ** attempt), max_delay)
+                    if jitter:
+                        delay *= (0.5 + random.random() * 0.5)  # Add 50% jitter
+                    
+                    logger.warning(f"Attempt {attempt + 1}/{max_retries} failed, retrying in {delay:.2f}s: {e}")
+                    
+                    # Add attempt context to exception if it's a ProteinDesignException
+                    if isinstance(e, ProteinDesignException):
+                        e.context.setdefault('retry_attempts', []).append({
+                            'attempt': attempt + 1,
+                            'delay': delay,
+                            'error': str(e)
+                        })
+                    
+                    time.sleep(delay)
+            
+            return None  # Should not reach here
+        
+        # Return appropriate wrapper based on function type
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
+    
     return decorator
 
 

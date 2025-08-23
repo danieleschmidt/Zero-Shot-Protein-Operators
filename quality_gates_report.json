@@ -1,49 +1,211 @@
 {
-  "timestamp": "2025-08-16 05:27:31",
-  "tests": {
-    "core_architecture": {
-      "status": "PASSED",
-      "details": "All core components functional"
-    },
-    "neural_operators": {
-      "status": "FAILED",
-      "error": "type object 'nn' has no attribute 'Conv3d'"
-    },
-    "optimization": {
-      "status": "PASSED",
-      "details": "Advanced optimizers functional"
-    },
-    "validation_framework": {
-      "status": "FAILED",
-      "error": "No module named 'scipy'"
-    },
-    "error_handling": {
-      "status": "FAILED",
-      "error": "cannot import name 'CircuitBreakerManager' from 'protein_operators.utils.error_recovery' (/root/repo/src/protein_operators/utils/error_recovery.py)"
-    },
-    "performance_monitoring": {
-      "status": "FAILED",
-      "error": "cannot import name 'PerformanceOptimizer' from 'protein_operators.utils.performance_optimizer' (/root/repo/src/protein_operators/utils/performance_optimizer.py)"
-    },
-    "configuration": {
-      "status": "FAILED",
-      "error": "cannot import name 'AdvancedConfigManager' from 'protein_operators.utils.configuration_manager' (/root/repo/src/protein_operators/utils/configuration_manager.py)"
-    },
-    "reproducibility": {
-      "status": "FAILED",
-      "error": "No module named 'matplotlib'"
-    },
-    "benchmarking": {
-      "status": "FAILED",
-      "error": "No module named 'scipy'"
-    },
-    "integration": {
-      "status": "PASSED",
-      "details": "Pipeline functional with notes: 'ProteinDesigner' object has no attribute 'encode_constraints'"
-    }
+  "timestamp": 1755961204.3653042,
+  "total_time": 2.4394352436065674,
+  "summary": {
+    "total_gates": 9,
+    "passed": 3,
+    "failed": 4,
+    "warnings": 2,
+    "skipped": 0,
+    "critical_failed": 3,
+    "overall_score": 57.757870447676254
   },
-  "overall_status": "NEEDS_ATTENTION",
-  "total_tests": 10,
-  "passed_tests": 3,
-  "failed_tests": 7
+  "results": [
+    {
+      "name": "Import Validation",
+      "status": "failed",
+      "score": 0.0,
+      "message": "Import errors: Traceback (most recent call last):\n  File \"<string>\", line 10, in <module>\nImportError: cannot import name 'PerformanceOptimizer' from 'protein_operators.utils.performance_optimization' (/root/repo/src/protein_operators/utils/performance_optimization.py). Did you mean: 'GlobalPerformanceOptimizer'?\n",
+      "execution_time": 0.2720050811767578,
+      "critical": true,
+      "details": {
+        "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 10, in <module>\nImportError: cannot import name 'PerformanceOptimizer' from 'protein_operators.utils.performance_optimization' (/root/repo/src/protein_operators/utils/performance_optimization.py). Did you mean: 'GlobalPerformanceOptimizer'?\n",
+        "stdout": ""
+      }
+    },
+    {
+      "name": "Code Quality",
+      "status": "failed",
+      "score": 97.11538461538461,
+      "message": "Syntax errors found in 3 files",
+      "execution_time": 0.6258456707000732,
+      "critical": false,
+      "details": {
+        "total_files": 104,
+        "valid_files": 101,
+        "syntax_score": 97.11538461538461,
+        "quality_issues_count": 8,
+        "checks": [
+          "Syntax error in /root/repo/src/protein_operators/database/connection.py: unterminated triple-quoted string literal (detected at line 33) (connection.py, line 26)",
+          "Syntax error in /root/repo/src/protein_operators/database/models.py: unexpected character after line continuation character (models.py, line 22)",
+          "Syntax error in /root/repo/src/protein_operators/utils/error_handling.py: expected 'except' or 'finally' block (error_handling.py, line 487)"
+        ]
+      }
+    },
+    {
+      "name": "Security Scanning",
+      "status": "warning",
+      "score": 70.0,
+      "message": "Found 19 medium-severity security issues",
+      "execution_time": 0.043099164962768555,
+      "critical": true,
+      "details": {
+        "total_vulnerabilities": 19,
+        "high_severity": 0,
+        "medium_severity": 19,
+        "vulnerabilities": [
+          {
+            "file": "/root/repo/src/protein_operators/enhanced_core.py",
+            "line": 1,
+            "pattern": "eval\\s*\\(",
+            "description": "Use of eval() function",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/benchmarks/benchmark_suite.py",
+            "line": 1,
+            "pattern": "eval\\s*\\(",
+            "description": "Use of eval() function",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/benchmarks/benchmark_suite.py",
+            "line": 1,
+            "pattern": "pickle\\.loads?\\s*\\(",
+            "description": "Unsafe pickle usage",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/cache/cache_manager.py",
+            "line": 1,
+            "pattern": "pickle\\.loads?\\s*\\(",
+            "description": "Unsafe pickle usage",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/cache/cache_manager.py",
+            "line": 1,
+            "pattern": "pickle\\.loads?\\s*\\(",
+            "description": "Unsafe pickle usage",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/research/paper_experiments.py",
+            "line": 1,
+            "pattern": "eval\\s*\\(",
+            "description": "Use of eval() function",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/utils/adaptive_caching.py",
+            "line": 1,
+            "pattern": "pickle\\.loads?\\s*\\(",
+            "description": "Unsafe pickle usage",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/utils/adaptive_caching.py",
+            "line": 1,
+            "pattern": "pickle\\.loads?\\s*\\(",
+            "description": "Unsafe pickle usage",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/utils/adaptive_caching.py",
+            "line": 1,
+            "pattern": "pickle\\.loads?\\s*\\(",
+            "description": "Unsafe pickle usage",
+            "severity": "medium"
+          },
+          {
+            "file": "/root/repo/src/protein_operators/utils/adaptive_caching.py",
+            "line": 1,
+            "pattern": "pickle\\.loads?\\s*\\(",
+            "description": "Unsafe pickle usage",
+            "severity": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unit Tests",
+      "status": "passed",
+      "score": 100.0,
+      "message": "Unit tests passed with 100.0% coverage",
+      "execution_time": 0.16149377822875977,
+      "critical": true,
+      "details": {
+        "coverage": 100.0,
+        "stdout": "\u2705 Basic functionality test passed\n\u2705 Validation system test passed\n\u2705 Error handling system test passed\nTests passed: 3/3 (100.0% coverage)\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "Integration Tests",
+      "status": "failed",
+      "score": 0.0,
+      "message": "Integration tests failed",
+      "execution_time": 0.10836935043334961,
+      "critical": true,
+      "details": {
+        "stderr": ""
+      }
+    },
+    {
+      "name": "Performance Benchmarks",
+      "status": "warning",
+      "score": 50.0,
+      "message": "Some performance benchmarks failed",
+      "execution_time": 0.10877537727355957,
+      "critical": false,
+      "details": {
+        "output": "Constraint creation: 0.001s for 100 iterations\n\u2705 benchmark_constraint_creation passed\n\u274c benchmark_cache_performance error: cannot import name 'IntelligentCache' from 'protein_operators.utils.performance_optimization' (/root/repo/src/protein_operators/utils/performance_optimization.py)\nPerformance benchmarks: 1/2 passed\n",
+        "errors": ""
+      }
+    },
+    {
+      "name": "Documentation Validation",
+      "status": "passed",
+      "score": 93.82904491931967,
+      "message": "Documentation coverage: 93.8%",
+      "execution_time": 0.9205918312072754,
+      "critical": false,
+      "details": {
+        "doc_files_found": 5,
+        "doc_files_required": 5,
+        "missing_docs": [],
+        "docstring_coverage": 87.65808983863934,
+        "total_functions": 2293,
+        "documented_functions": 2010
+      }
+    },
+    {
+      "name": "Research Validation",
+      "status": "passed",
+      "score": 108.87640449438202,
+      "message": "Research validation passed (2 indicators)",
+      "execution_time": 0.018144607543945312,
+      "critical": false,
+      "details": {
+        "validation_points": [
+          "Research files present",
+          "Research citations present"
+        ],
+        "science_indicators": 88,
+        "citations_found": true,
+        "research_files": 7
+      }
+    },
+    {
+      "name": "System Integration",
+      "status": "failed",
+      "score": 0.0,
+      "message": "System integration failed",
+      "execution_time": 0.17824578285217285,
+      "critical": true,
+      "details": {
+        "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 42, in <module>\n  File \"<string>\", line 13, in test_complete_system\nImportError: cannot import name 'PerformanceOptimizer' from 'protein_operators.utils.performance_optimization' (/root/repo/src/protein_operators/utils/performance_optimization.py). Did you mean: 'GlobalPerformanceOptimizer'?\n"
+      }
+    }
+  ]
 }

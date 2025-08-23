@@ -1,0 +1,1073 @@
+# Advanced Production Orchestration - Autonomous SDLC v4.0
+# Terragon Labs - Production-Ready Protein Design System
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    environment: production
+    managed-by: autonomous-sdlc
+    terragon-labs: true
+    deployment-tier: production
+    sdlc-version: "4.0"
+  annotations:
+    autonomous-sdlc/deployment-strategy: "blue-green"
+    autonomous-sdlc/auto-scaling: "enabled"
+    autonomous-sdlc/monitoring: "comprehensive"
+    kubernetes.io/managed-by: "terragon-autonomous-sdlc"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: autonomous-config
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    config-tier: production
+data:
+  # Autonomous System Configuration
+  AUTONOMOUS_MODE: "enabled"
+  SDLC_VERSION: "4.0"
+  DEPLOYMENT_STRATEGY: "blue-green"
+  
+  # Application Configuration
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  CACHE_SIZE_MB: "4096"
+  MAX_CONCURRENT_DESIGNS: "50"
+  
+  # Feature Flags
+  ENABLE_MONITORING: "true"
+  ENABLE_SECURITY: "true"
+  ENABLE_DISTRIBUTED: "true"
+  ENABLE_AUTO_SCALING: "true"
+  ENABLE_QUANTUM_OPTIMIZATION: "true"
+  ENABLE_ADVANCED_CACHING: "true"
+  ENABLE_RESEARCH_MODE: "true"
+  
+  # Database Configuration
+  POSTGRES_HOST: "postgres-cluster-service"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "protein_operators_prod"
+  POSTGRES_MAX_CONNECTIONS: "200"
+  
+  # Cache Configuration
+  REDIS_HOST: "redis-cluster-service"
+  REDIS_PORT: "6379"
+  REDIS_CLUSTER_NODES: "6"
+  
+  # Monitoring Configuration
+  PROMETHEUS_PORT: "9090"
+  GRAFANA_PORT: "3000"
+  JAEGER_AGENT_HOST: "jaeger-agent"
+  
+  # Performance Optimization
+  NEURAL_OPERATOR_BATCH_SIZE: "32"
+  GPU_MEMORY_FRACTION: "0.9"
+  OPTIMIZATION_STRATEGY: "quantum_annealing"
+  
+  # Autonomous Decision Making
+  AUTO_SCALE_TARGET_CPU: "70"
+  AUTO_SCALE_TARGET_MEMORY: "80"
+  HEALTH_CHECK_INTERVAL: "10"
+  CIRCUIT_BREAKER_THRESHOLD: "5"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: autonomous-secrets
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    security-tier: high
+type: Opaque
+data:
+  # Database credentials (base64 encoded)
+  POSTGRES_USER: YXV0b25vbW91c19wcm90ZWlu  # autonomous_protein
+  POSTGRES_PASSWORD: QXV0b25vbW91c1Byb3RlaW5PcGVyYXRvcnNfUHJvZF8yMDI1IQ==  # AutonomousProteinOperators_Prod_2025!
+  
+  # Cache credentials
+  REDIS_PASSWORD: QXV0b25vbW91c1JlZGlzX1Byb2RfMjAyNSE=  # AutonomousRedis_Prod_2025!
+  
+  # API Security
+  JWT_SECRET: QXV0b25vbW91c0pXVF9TZWNyZXRfUHJvZF8yMDI1X1NlY3VyZSE=  # AutonomousJWT_Secret_Prod_2025_Secure!
+  API_KEY: QXV0b25vbW91c0FQSV9LZXlfUHJvZF8yMDI1X1NlY3VyZSE=  # AutonomousAPI_Key_Prod_2025_Secure!
+  
+  # Encryption keys
+  ENCRYPTION_KEY: QXV0b25vbW91c0VuY3J5cHRpb25fS2V5X1Byb2RfMjAyNSE=  # AutonomousEncryption_Key_Prod_2025!
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autonomous-api-server
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: api
+    tier: frontend
+    autonomous-sdlc: enabled
+spec:
+  replicas: 5  # High availability
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0  # Zero downtime deployments
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: api
+  template:
+    metadata:
+      labels:
+        app: protein-operators
+        component: api
+        tier: frontend
+        deployment-version: "4.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+        autonomous-sdlc/health-check: "comprehensive"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: autonomous-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: compute-optimized
+      tolerations:
+      - key: "high-performance"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: ["protein-operators"]
+                - key: component
+                  operator: In
+                  values: ["api"]
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: api-server
+        image: terragon/protein-operators:4.0-autonomous
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        - containerPort: 8080
+          name: admin
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8000"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: ADMIN_PORT
+          value: "8080"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        envFrom:
+        - configMapRef:
+            name: autonomous-config
+        - secretRef:
+            name: autonomous-secrets
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+            ephemeral-storage: "5Gi"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            ephemeral-storage: "10Gi"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60  # Allow 5 minutes for startup
+          successThreshold: 1
+        volumeMounts:
+        - name: cache-storage
+          mountPath: /app/cache
+        - name: models-storage
+          mountPath: /app/models
+          readOnly: true
+        - name: logs-storage
+          mountPath: /app/logs
+        - name: tmp-storage
+          mountPath: /tmp
+      volumes:
+      - name: cache-storage
+        persistentVolumeClaim:
+          claimName: autonomous-cache-pvc
+      - name: models-storage
+        persistentVolumeClaim:
+          claimName: autonomous-models-pvc
+      - name: logs-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: tmp-storage
+        emptyDir:
+          sizeLimit: 2Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autonomous-workers
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: worker
+    tier: compute
+    autonomous-sdlc: enabled
+spec:
+  replicas: 10  # Scaled for production workload
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 5
+      maxUnavailable: 2
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: protein-operators
+        component: worker
+        tier: compute
+        deployment-version: "4.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        autonomous-sdlc/gpu-required: "true"
+        autonomous-sdlc/compute-intensive: "true"
+    spec:
+      serviceAccountName: autonomous-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        accelerator: nvidia-tesla-v100  # GPU nodes
+        node-type: gpu-optimized
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "high-performance"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      containers:
+      - name: protein-worker
+        image: terragon/protein-operators:4.0-autonomous-gpu
+        imagePullPolicy: Always
+        command: ["python", "-m", "protein_operators.autonomous_worker"]
+        ports:
+        - containerPort: 9091
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: worker-api
+          protocol: TCP
+        env:
+        - name: WORKER_TYPE
+          value: "autonomous_design"
+        - name: MAX_CONCURRENT_TASKS
+          value: "8"
+        - name: GPU_ENABLED
+          value: "true"
+        - name: WORKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        envFrom:
+        - configMapRef:
+            name: autonomous-config
+        - secretRef:
+            name: autonomous-secrets
+        resources:
+          requests:
+            memory: "16Gi"
+            cpu: "8000m"
+            nvidia.com/gpu: "1"
+            ephemeral-storage: "20Gi"
+          limits:
+            memory: "32Gi"
+            cpu: "16000m"
+            nvidia.com/gpu: "1"
+            ephemeral-storage: "50Gi"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "from protein_operators.health import worker_health_check; worker_health_check()"
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /worker/ready
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        volumeMounts:
+        - name: cache-storage
+          mountPath: /app/cache
+        - name: models-storage
+          mountPath: /app/models
+          readOnly: true
+        - name: workspace-storage
+          mountPath: /app/workspace
+        - name: gpu-libs
+          mountPath: /usr/local/cuda
+          readOnly: true
+      volumes:
+      - name: cache-storage
+        persistentVolumeClaim:
+          claimName: autonomous-cache-pvc
+      - name: models-storage
+        persistentVolumeClaim:
+          claimName: autonomous-models-pvc
+      - name: workspace-storage
+        emptyDir:
+          sizeLimit: 20Gi
+      - name: gpu-libs
+        hostPath:
+          path: /usr/local/cuda
+          type: Directory
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autonomous-coordinator
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: coordinator
+    tier: control
+    autonomous-sdlc: enabled
+spec:
+  replicas: 3  # High availability with leader election
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: coordinator
+  template:
+    metadata:
+      labels:
+        app: protein-operators
+        component: coordinator
+        tier: control
+        deployment-version: "4.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9092"
+        autonomous-sdlc/leader-election: "enabled"
+    spec:
+      serviceAccountName: autonomous-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values: ["protein-operators"]
+              - key: component
+                operator: In
+                values: ["coordinator"]
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: coordinator
+        image: terragon/protein-operators:4.0-autonomous
+        imagePullPolicy: Always
+        command: ["python", "-m", "protein_operators.autonomous_coordinator"]
+        ports:
+        - containerPort: 8082
+          name: coordination
+          protocol: TCP
+        - containerPort: 9092
+          name: metrics
+          protocol: TCP
+        - containerPort: 8083
+          name: leader-election
+          protocol: TCP
+        env:
+        - name: COORDINATOR_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: COORDINATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: LEADER_ELECTION_ENABLED
+          value: "true"
+        envFrom:
+        - configMapRef:
+            name: autonomous-config
+        - secretRef:
+            name: autonomous-secrets
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /coordinator/health
+            port: 8082
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /coordinator/ready
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: coordinator-config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: coordinator-config
+        configMap:
+          name: autonomous-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: autonomous-api-service
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: api
+spec:
+  selector:
+    app: protein-operators
+    component: api
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: admin
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: autonomous-workers-service
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: worker
+spec:
+  selector:
+    app: protein-operators
+    component: worker
+  ports:
+  - name: metrics
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  - name: worker-api
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
+  type: ClusterIP
+  clusterIP: None  # Headless service for direct worker communication
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: autonomous-coordinator-service
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: coordinator
+spec:
+  selector:
+    app: protein-operators
+    component: coordinator
+  ports:
+  - name: coordination
+    port: 8082
+    targetPort: 8082
+    protocol: TCP
+  - name: metrics
+    port: 9092
+    targetPort: 9092
+    protocol: TCP
+  - name: leader-election
+    port: 8083
+    targetPort: 8083
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: autonomous-ingress
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - api.autonomous-protein-operators.com
+    - admin.autonomous-protein-operators.com
+    secretName: autonomous-tls-secret
+  rules:
+  - host: api.autonomous-protein-operators.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: autonomous-api-service
+            port:
+              number: 80
+  - host: admin.autonomous-protein-operators.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: autonomous-api-service
+            port:
+              number: 8080
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: autonomous-cache-pvc
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    storage-tier: high-performance
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi  # Large cache for production
+  storageClassName: nvme-ssd
+  
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: autonomous-models-pvc
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    storage-tier: models
+spec:
+  accessModes:
+  - ReadOnlyMany
+  resources:
+    requests:
+      storage: 100Gi  # Pre-trained models storage
+  storageClassName: standard-ssd
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: autonomous-api-hpa
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: autonomous-api-server
+  minReplicas: 5
+  maxReplicas: 50  # Massive scale capability
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: active_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 5
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: autonomous-workers-hpa
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: autonomous-workers
+  minReplicas: 10
+  maxReplicas: 100  # Massive parallel processing capability
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  - type: Resource
+    resource:
+      name: nvidia.com/gpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 5
+        periodSeconds: 60
+      - type: Percent
+        value: 50
+        periodSeconds: 120
+    scaleDown:
+      stabilizationWindowSeconds: 900  # Slower scale-down for GPU resources
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 120
+      - type: Percent
+        value: 25
+        periodSeconds: 180
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: autonomous-service-account
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+  annotations:
+    autonomous-sdlc/permissions: "enhanced"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: autonomous-cluster-role
+  labels:
+    app: protein-operators
+rules:
+# Pod and service discovery
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "nodes"]
+  verbs: ["get", "list", "watch"]
+# Deployment and scaling management
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+# HPA management for autonomous scaling
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "patch", "update"]
+# Metrics access
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+# Custom metrics for advanced scaling
+- apiGroups: ["custom.metrics.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list"]
+# Leader election for coordinators
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "create", "update", "patch", "watch"]
+# Events for autonomous reporting
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: autonomous-cluster-role-binding
+  labels:
+    app: protein-operators
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: autonomous-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: autonomous-service-account
+  namespace: protein-operators-autonomous
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: autonomous-api-pdb
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: api
+spec:
+  minAvailable: 3  # Ensure high availability
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: autonomous-workers-pdb
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: worker
+spec:
+  minAvailable: 7  # Ensure continued compute capacity
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: worker
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: autonomous-coordinator-pdb
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+    component: coordinator
+spec:
+  minAvailable: 2  # Ensure coordination availability
+  selector:
+    matchLabels:
+      app: protein-operators
+      component: coordinator
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: autonomous-network-policy
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+spec:
+  podSelector:
+    matchLabels:
+      app: protein-operators
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from nginx
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8080
+  # Allow monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9091
+    - protocol: TCP
+      port: 9092
+  # Internal communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app: protein-operators
+    ports:
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+    - protocol: TCP
+      port: 8083
+  egress:
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow external HTTPS
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow database connections
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow cache connections
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Internal service communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app: protein-operators
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: autonomous-limit-range
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+spec:
+  limits:
+  - default:
+      memory: "2Gi"
+      cpu: "1000m"
+      ephemeral-storage: "5Gi"
+    defaultRequest:
+      memory: "500Mi"
+      cpu: "100m"
+      ephemeral-storage: "1Gi"
+    max:
+      memory: "32Gi"
+      cpu: "16000m"
+      ephemeral-storage: "50Gi"
+      nvidia.com/gpu: "2"
+    min:
+      memory: "100Mi"
+      cpu: "50m"
+      ephemeral-storage: "500Mi"
+    type: Container
+  - default:
+      storage: "10Gi"
+    max:
+      storage: "1Ti"
+    min:
+      storage: "1Gi"
+    type: PersistentVolumeClaim
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: autonomous-resource-quota
+  namespace: protein-operators-autonomous
+  labels:
+    app: protein-operators
+spec:
+  hard:
+    # Compute resources
+    requests.cpu: "200"
+    requests.memory: "400Gi"
+    requests.nvidia.com/gpu: "100"
+    limits.cpu: "400"
+    limits.memory: "800Gi"
+    limits.nvidia.com/gpu: "100"
+    
+    # Storage resources
+    requests.storage: "2Ti"
+    persistentvolumeclaims: "20"
+    
+    # Object counts
+    pods: "200"
+    services: "50"
+    secrets: "20"
+    configmaps: "20"
+    
+    # Ephemeral storage
+    requests.ephemeral-storage: "1Ti"
+    limits.ephemeral-storage: "2Ti"
