@@ -179,7 +179,7 @@ from protein_operators import ProteinDesigner, Constraints
 from protein_operators.utils.comprehensive_validation import ComprehensiveValidator
 from protein_operators.utils.advanced_error_handling import AdvancedErrorHandler
 from protein_operators.utils.monitoring_system import MonitoringSystem
-from protein_operators.utils.performance_optimization import PerformanceOptimizer
+from protein_operators.utils.performance_optimization import GlobalPerformanceOptimizer as PerformanceOptimizer
 from protein_operators.utils.auto_scaling import AutoScaler
 
 # Test constraint creation
@@ -542,7 +542,7 @@ def test_full_pipeline():
 
 def test_system_integration():
     """Test system component integration."""
-    from protein_operators.utils.performance_optimization import PerformanceOptimizer
+    from protein_operators.utils.performance_optimization import GlobalPerformanceOptimizer as PerformanceOptimizer
     from protein_operators.utils.monitoring_system import MonitoringSystem
     from protein_operators.utils.auto_scaling import create_optimized_system
     
@@ -632,7 +632,7 @@ def benchmark_constraint_creation():
 
 def benchmark_cache_performance():
     """Benchmark cache performance."""
-    from protein_operators.utils.performance_optimization import IntelligentCache
+    from protein_operators.utils.adaptive_caching import IntelligentCache
     
     cache = IntelligentCache(max_size=1000)
     
@@ -878,7 +878,7 @@ def test_complete_system():
     from protein_operators.utils.comprehensive_validation import ComprehensiveValidator, ValidationLevel
     from protein_operators.utils.advanced_error_handling import AdvancedErrorHandler
     from protein_operators.utils.monitoring_system import MonitoringSystem
-    from protein_operators.utils.performance_optimization import PerformanceOptimizer
+    from protein_operators.utils.performance_optimization import GlobalPerformanceOptimizer as PerformanceOptimizer
     from protein_operators.utils.auto_scaling import create_optimized_system
     
     print("✅ All imports successful")

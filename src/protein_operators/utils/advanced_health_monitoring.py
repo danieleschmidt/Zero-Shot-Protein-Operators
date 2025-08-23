@@ -465,35 +465,130 @@ class HealthMonitor:
         return results
     
     def _collect_system_metrics(self):
-        """Collect system-level metrics."""
+        """Collect comprehensive system-level metrics with enhanced monitoring."""
         try:
-            # CPU and memory
+            # CPU and memory with extended metrics
             cpu_percent = psutil.cpu_percent(interval=1)
             memory = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
             
-            self.metrics_collector.set_gauge('system_cpu_percent', cpu_percent)
+            # Enhanced CPU metrics
+            try:
+                cpu_per_core = psutil.cpu_percent(percpu=True)
+                cpu_freq = psutil.cpu_freq()
+                load_avg = os.getloadavg() if hasattr(os, 'getloadavg') else (0, 0, 0)
+                
+                self.metrics_collector.set_gauge('system_cpu_percent', cpu_percent)
+                self.metrics_collector.set_gauge('system_cpu_cores_count', len(cpu_per_core))
+                self.metrics_collector.set_gauge('system_cpu_max_usage', max(cpu_per_core) if cpu_per_core else cpu_percent)
+                self.metrics_collector.set_gauge('system_load_1min', load_avg[0])
+                self.metrics_collector.set_gauge('system_load_5min', load_avg[1])
+                self.metrics_collector.set_gauge('system_load_15min', load_avg[2])
+                
+                if cpu_freq:
+                    self.metrics_collector.set_gauge('system_cpu_freq_current_mhz', cpu_freq.current)
+                    self.metrics_collector.set_gauge('system_cpu_freq_max_mhz', cpu_freq.max or 0)
+            
+            except Exception:
+                # Fallback to basic CPU monitoring
+                self.metrics_collector.set_gauge('system_cpu_percent', cpu_percent)
+            
+            # Enhanced memory metrics
             self.metrics_collector.set_gauge('system_memory_percent', memory.percent)
             self.metrics_collector.set_gauge('system_memory_used_gb', memory.used / (1024**3))
             self.metrics_collector.set_gauge('system_memory_available_gb', memory.available / (1024**3))
-            self.metrics_collector.set_gauge('system_disk_usage_percent', disk.percent)
+            self.metrics_collector.set_gauge('system_memory_total_gb', memory.total / (1024**3))
+            self.metrics_collector.set_gauge('system_memory_free_gb', memory.free / (1024**3))
             
-            # Network and file descriptors
+            # Swap metrics
+            try:
+                swap = psutil.swap_memory()
+                self.metrics_collector.set_gauge('system_swap_percent', swap.percent)
+                self.metrics_collector.set_gauge('system_swap_used_gb', swap.used / (1024**3))
+                self.metrics_collector.set_gauge('system_swap_total_gb', swap.total / (1024**3))
+            except Exception:
+                pass
+            
+            # Enhanced disk metrics
+            self.metrics_collector.set_gauge('system_disk_usage_percent', disk.percent)
+            self.metrics_collector.set_gauge('system_disk_used_gb', disk.used / (1024**3))
+            self.metrics_collector.set_gauge('system_disk_free_gb', disk.free / (1024**3))
+            self.metrics_collector.set_gauge('system_disk_total_gb', disk.total / (1024**3))
+            
+            # Disk I/O metrics
+            try:
+                disk_io = psutil.disk_io_counters()
+                if disk_io:
+                    self.metrics_collector.increment_counter('system_disk_read_bytes', disk_io.read_bytes)
+                    self.metrics_collector.increment_counter('system_disk_write_bytes', disk_io.write_bytes)
+                    self.metrics_collector.increment_counter('system_disk_read_count', disk_io.read_count)
+                    self.metrics_collector.increment_counter('system_disk_write_count', disk_io.write_count)
+            except Exception:
+                pass
+            
+            # Network metrics
+            try:
+                net_io = psutil.net_io_counters()
+                if net_io:
+                    self.metrics_collector.increment_counter('system_network_bytes_sent', net_io.bytes_sent)
+                    self.metrics_collector.increment_counter('system_network_bytes_recv', net_io.bytes_recv)
+                    self.metrics_collector.increment_counter('system_network_packets_sent', net_io.packets_sent)
+                    self.metrics_collector.increment_counter('system_network_packets_recv', net_io.packets_recv)
+                    self.metrics_collector.increment_counter('system_network_errors_in', net_io.errin)
+                    self.metrics_collector.increment_counter('system_network_errors_out', net_io.errout)
+            except Exception:
+                pass
+            
+            # Process-level metrics
             try:
                 process = psutil.Process()
                 fd_count = process.num_fds()
                 connections = len(process.connections())
                 
+                # Memory details for current process
+                process_memory = process.memory_info()
+                self.metrics_collector.set_gauge('process_memory_rss_gb', process_memory.rss / (1024**3))
+                self.metrics_collector.set_gauge('process_memory_vms_gb', process_memory.vms / (1024**3))
+                self.metrics_collector.set_gauge('process_memory_percent', process.memory_percent())
+                
+                # File descriptors and connections
                 self.metrics_collector.set_gauge('system_open_fds', fd_count)
                 self.metrics_collector.set_gauge('system_connections', connections)
+                
+                # Process CPU usage
+                self.metrics_collector.set_gauge('process_cpu_percent', process.cpu_percent())
+                
+                # Process threads
+                self.metrics_collector.set_gauge('process_num_threads', process.num_threads())
+                
             except Exception:
                 pass  # May not be available on all systems
             
-            # GPU metrics (if available)
+            # GPU metrics with enhanced monitoring
             self._collect_gpu_metrics()
+            
+            # Temperature monitoring (if available)
+            self._collect_temperature_metrics()
             
         except Exception as e:
             logging.error(f"Error collecting system metrics: {e}")
+    
+    def _collect_temperature_metrics(self):
+        """Collect temperature metrics if available."""
+        try:
+            temps = psutil.sensors_temperatures()
+            if temps:
+                for sensor_name, sensor_list in temps.items():
+                    for i, sensor in enumerate(sensor_list):
+                        if sensor.current:
+                            metric_name = f'system_temp_{sensor_name}_{i}_celsius'
+                            self.metrics_collector.set_gauge(metric_name, sensor.current)
+                            
+                            # Alert on high temperatures
+                            if sensor.high and sensor.current > sensor.high:
+                                logging.warning(f"High temperature detected: {sensor_name} {sensor.current}°C > {sensor.high}°C")
+        except Exception:
+            pass  # Temperature sensors may not be available
     
     def _collect_gpu_metrics(self):
         """Collect GPU metrics if available."""
