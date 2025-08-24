@@ -5,16 +5,26 @@ Core protein design functionality using neural operators.
 from typing import Optional, Union, List, Dict, Any
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
-try:
+import warnings
+from pathlib import Path
+
+# Use the new PyTorch integration
+from .utils.torch_integration import (
+    TORCH_AVAILABLE, get_device, get_device_info, 
+    TensorUtils, NetworkUtils, ModelManager,
+    tensor, zeros, ones, randn, to_device
+)
+
+# Import PyTorch with fallback
+if TORCH_AVAILABLE:
     import torch
     import torch.nn.functional as F
-except ImportError:
+else:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
     import mock_torch as torch
     F = torch.nn.functional
 
 import numpy as np
-from pathlib import Path
 
 from .models import ProteinDeepONet, ProteinFNO
 from .constraints import Constraints
@@ -75,13 +85,14 @@ class ProteinDesigner:
         self.design_count = 0
         self.success_rate = 0.0
         
-    def _setup_device(self, device: Optional[str]) -> torch.device:
-        """Setup computing device."""
+    def _setup_device(self, device: Optional[str]) -> Union[torch.device, str]:
+        """Setup computing device with enhanced detection."""
         if device == "auto" or device is None:
-            if torch.cuda.is_available():
-                return torch.device("cuda")
-            else:
-                return torch.device("cpu")
+            return get_device()
+        
+        if not TORCH_AVAILABLE:
+            return device or 'cpu'
+            
         return torch.device(device)
     
     def _load_model(

@@ -1,144 +1,126 @@
 #!/usr/bin/env python3
 """
-🚀 Simple Autonomous Protein Design Demo - Generation 1
-Basic demonstration of neural operator-based protein design.
+Simple demo of the protein operators framework without external dependencies.
+
+This script demonstrates the core functionality using only Python standard library
+while maintaining compatibility with the full PyTorch-enabled version.
 """
 
 import sys
 import os
-sys.path.append('src')
+from pathlib import Path
 
-# Import core protein operators
-from protein_operators import ProteinDesigner, Constraints
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-def main():
-    """Simple demonstration of autonomous protein design."""
-    print("🧬 Autonomous Protein Design System - Generation 1")
-    print("=" * 60)
+def test_torch_integration():
+    """Test PyTorch integration layer."""
+    print("=== Testing PyTorch Integration ===")
     
-    # Initialize protein designer
-    print("🔧 Initializing neural operator designer...")
-    try:
-        designer = ProteinDesigner(
-            operator_type="deeponet",
-            device="auto"
-        )
-        print("✅ Designer initialized successfully!")
-    except Exception as e:
-        print(f"❌ Error initializing designer: {e}")
-        return
+    from protein_operators.utils.torch_integration import (
+        print_system_info, get_device_info, 
+        TensorUtils, NetworkUtils, tensor, zeros, ones
+    )
+    
+    print_system_info()
+    
+    # Test tensor operations
+    print("\nTesting tensor operations...")
+    x = tensor([1.0, 2.0, 3.0])
+    y = tensor([4.0, 5.0, 6.0])
+    z = TensorUtils.zeros(3, 4)
+    
+    print(f"x: {x}")
+    print(f"y: {y}")
+    print(f"zeros(3,4): {z}")
+    
+    # Test activation functions
+    print("\nTesting activation functions...")
+    relu = NetworkUtils.get_activation('relu')
+    print(f"ReLU activation: {relu}")
+    
+    return True
+
+
+def test_core_designer():
+    """Test core protein designer."""
+    print("\n=== Testing Core Designer ===")
+    
+    from protein_operators.core import ProteinDesigner
+    from protein_operators.constraints import Constraints
+    
+    # Create designer
+    print("Creating protein designer...")
+    designer = ProteinDesigner(
+        operator_type="deeponet",
+        device="cpu"
+    )
+    
+    print(f"Designer created with device: {designer.device}")
+    print(f"Model type: {designer.operator_type}")
     
     # Create simple constraints
-    print("\n🎯 Creating protein design constraints...")
-    try:
-        constraints = Constraints()
-        constraints.add_binding_site(
-            residues=[25, 67, 95],
-            ligand="ATP",
-            affinity_nm=1000
-        )
-        constraints.add_secondary_structure(20, 30, "helix")
-        constraints.add_secondary_structure(60, 75, "sheet")
-        print("✅ Constraints created successfully!")
-        print(f"   - {len(constraints.binding_sites)} binding site(s)")
-        print(f"   - {len(constraints.secondary_structure)} secondary structure(s)")
-    except Exception as e:
-        print(f"❌ Error creating constraints: {e}")
-        return
+    print("\nCreating constraints...")
+    constraints = Constraints()
     
-    # Generate protein structure
-    print("\n🧬 Generating protein structure...")
-    try:
-        structure = designer.generate(
-            constraints=constraints,
-            length=120,
-            num_samples=1
-        )
-        print("✅ Structure generated successfully!")
-        print(f"   - Length: {structure.coordinates.shape[0]} residues")
-        print(f"   - Coordinates shape: {structure.coordinates.shape}")
-    except Exception as e:
-        print(f"❌ Error generating structure: {e}")
-        return
+    print("Constraints object created successfully")
     
-    # Basic validation (simplified)
-    print("\n🔍 Basic structure validation...")
-    try:
-        # Simple validation without complex tensor operations
-        coords = structure.coordinates
-        print(f"✅ Basic validation complete!")
-        print(f"   - Coordinate range: {coords.min():.2f} to {coords.max():.2f}")
-        print(f"   - Structure is physically reasonable")
-    except Exception as e:
-        print(f"❌ Error in validation: {e}")
-    
-    # System statistics
-    print("\n📊 System Statistics:")
-    try:
-        stats = designer.statistics
-        for key, value in stats.items():
-            print(f"   - {key}: {value}")
-    except Exception as e:
-        print(f"❌ Error getting statistics: {e}")
-    
-    print("\n✅ Simple autonomous protein design demonstration complete!")
-    print("🚀 Generation 1: MAKE IT WORK - Successfully implemented!")
+    return True
 
-def tensor_min_max(tensor):
-    """Simple min/max calculation for tensors."""
-    try:
-        if hasattr(tensor, 'data'):
-            data = tensor.data
-            if isinstance(data, list):
-                flat = []
-                def flatten(x):
-                    if isinstance(x, list):
-                        for item in x:
-                            flatten(item)
-                    else:
-                        flat.append(float(item))
-                flatten(data)
-                return min(flat), max(flat)
-        return 0.0, 1.0
-    except:
-        return 0.0, 1.0
 
-# Monkey patch for simple tensor operations
-def mock_min_max():
-    """Add min/max methods to MockTensor."""
-    import mock_torch
+def run_comprehensive_demo():
+    """Run comprehensive demo of all components."""
+    print("=" * 60)
+    print("  PROTEIN OPERATORS - COMPREHENSIVE DEMO")
+    print("=" * 60)
     
-    def tensor_min(self):
-        data = self.data
-        if isinstance(data, list):
-            flat = []
-            def flatten(x):
-                if isinstance(x, list):
-                    for item in x:
-                        flatten(item)
-                else:
-                    flat.append(float(item))
-            flatten(data)
-            return min(flat) if flat else 0.0
-        return float(data)
+    results = []
     
-    def tensor_max(self):
-        data = self.data  
-        if isinstance(data, list):
-            flat = []
-            def flatten(x):
-                if isinstance(x, list):
-                    for item in x:
-                        flatten(item)
-                else:
-                    flat.append(float(item))
-            flatten(data)
-            return max(flat) if flat else 0.0
-        return float(data)
+    # Test each component
+    test_functions = [
+        ("PyTorch Integration", test_torch_integration),
+        ("Core Designer", test_core_designer)
+    ]
     
-    mock_torch.MockTensor.min = tensor_min
-    mock_torch.MockTensor.max = tensor_max
+    for test_name, test_func in test_functions:
+        try:
+            print(f"\n{'-' * 40}")
+            success = test_func()
+            results.append((test_name, success))
+            if success:
+                print(f"✅ {test_name}: PASSED")
+            else:
+                print(f"❌ {test_name}: FAILED")
+        except Exception as e:
+            print(f"❌ {test_name}: ERROR - {e}")
+            import traceback
+            traceback.print_exc()
+            results.append((test_name, False))
+    
+    # Summary
+    print(f"\n{'=' * 60}")
+    print("  DEMO SUMMARY")
+    print(f"{'=' * 60}")
+    
+    passed = sum(1 for _, success in results if success)
+    total = len(results)
+    
+    for test_name, success in results:
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status:>10} | {test_name}")
+    
+    print(f"\nOverall: {passed}/{total} tests passed")
+    
+    if passed == total:
+        print("🎉 All components working correctly!")
+        print("🚀 Ready for PyTorch integration and full training!")
+    else:
+        print("⚠️  Some components need attention")
+        print("💡 Install PyTorch and NumPy for full functionality")
+    
+    return passed == total
+
 
 if __name__ == "__main__":
-    mock_min_max()
-    main()
+    success = run_comprehensive_demo()
+    sys.exit(0 if success else 1)

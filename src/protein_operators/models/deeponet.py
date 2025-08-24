@@ -5,15 +5,23 @@ Based on "Learning nonlinear operators via DeepONet" (Lu et al., 2021)
 Extended for protein structure generation from biophysical constraints.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any, Tuple
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
-try:
+
+# Use the new PyTorch integration
+from ..utils.torch_integration import (
+    TORCH_AVAILABLE, tensor, zeros, ones, randn,
+    TensorUtils, NetworkUtils, get_device
+)
+
+# Import PyTorch with fallback
+if TORCH_AVAILABLE:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
-except ImportError:
+else:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
     import mock_torch as torch
     nn = torch.nn
     F = torch.nn.functional
