@@ -1,0 +1,645 @@
+---
+# Global Research Infrastructure for Distributed Protein Design
+# Multi-region deployment with advanced research computing capabilities
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: protein-research-global
+  labels:
+    purpose: research
+    region-scope: global
+    tier: production
+
+---
+# Global ConfigMap for Research Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: global-research-config
+  namespace: protein-research-global
+data:
+  # Global research settings
+  research_mode: "distributed"
+  quantum_computing_enabled: "true"
+  distributed_training: "true"
+  multi_region_sync: "true"
+  
+  # Regional deployment zones
+  primary_region: "us-central"
+  secondary_regions: "eu-west,asia-east,us-west"
+  
+  # Research compute specifications
+  quantum_simulator_nodes: "4"
+  gpu_nodes_per_region: "8"
+  cpu_nodes_per_region: "16"
+  
+  # Research data configuration
+  global_dataset_cache: "enabled"
+  experiment_replication: "3"
+  statistical_validation: "strict"
+  
+  # Performance and scaling
+  max_concurrent_experiments: "100"
+  auto_scaling_enabled: "true"
+  resource_sharing_enabled: "true"
+
+---
+# Global Research Database (Distributed)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: research-database-global
+  namespace: protein-research-global
+  labels:
+    component: database
+    tier: research
+spec:
+  serviceName: research-db-service
+  replicas: 3
+  selector:
+    matchLabels:
+      app: research-database
+  template:
+    metadata:
+      labels:
+        app: research-database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: "protein_research_global"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: research-db-secret
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: research-db-secret
+              key: password
+        - name: POSTGRES_REPLICATION_MODE
+          value: "master"
+        - name: POSTGRES_REPLICATION_USER
+          value: "replicator"
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: fast-ssd
+
+---
+# Quantum Computing Simulation Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantum-simulator
+  namespace: protein-research-global
+  labels:
+    component: quantum-simulator
+    tier: research-compute
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: quantum-simulator
+  template:
+    metadata:
+      labels:
+        app: quantum-simulator
+    spec:
+      nodeSelector:
+        node-type: high-memory
+      containers:
+      - name: quantum-simulator
+        image: protein-operators:latest
+        command: ["python", "-m", "protein_operators.research.quantum_classical_hybrid"]
+        env:
+        - name: QUANTUM_SIMULATION_MODE
+          value: "distributed"
+        - name: QUBITS_PER_NODE
+          value: "16"
+        - name: ENTANGLEMENT_DEPTH
+          value: "4"
+        - name: COHERENCE_TIME
+          value: "100"
+        - name: REDIS_URL
+          value: "redis://redis-cluster:6379"
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "4000m"
+          limits:
+            memory: "16Gi"
+            cpu: "8000m"
+        volumeMounts:
+        - name: quantum-state-storage
+          mountPath: /quantum-states
+      volumes:
+      - name: quantum-state-storage
+        persistentVolumeClaim:
+          claimName: quantum-state-pvc
+
+---
+# Distributed Training Service (Multi-GPU)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: distributed-training
+  namespace: protein-research-global
+  labels:
+    component: distributed-training
+    tier: research-compute
+spec:
+  replicas: 8
+  selector:
+    matchLabels:
+      app: distributed-training
+  template:
+    metadata:
+      labels:
+        app: distributed-training
+    spec:
+      nodeSelector:
+        accelerator: nvidia-tesla-v100
+      containers:
+      - name: training-worker
+        image: protein-operators:latest
+        command: ["python", "-m", "protein_operators.infrastructure.distributed_training"]
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0,1,2,3"
+        - name: NCCL_DEBUG
+          value: "INFO"
+        - name: DISTRIBUTED_BACKEND
+          value: "nccl"
+        - name: WORLD_SIZE
+          value: "8"
+        - name: RANK
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MASTER_ADDR
+          value: "distributed-training-master"
+        - name: MASTER_PORT
+          value: "23456"
+        ports:
+        - containerPort: 23456
+        resources:
+          requests:
+            nvidia.com/gpu: 4
+            memory: "16Gi"
+            cpu: "8000m"
+          limits:
+            nvidia.com/gpu: 4
+            memory: "32Gi"
+            cpu: "16000m"
+        volumeMounts:
+        - name: training-data
+          mountPath: /data
+        - name: model-checkpoints
+          mountPath: /checkpoints
+      volumes:
+      - name: training-data
+        persistentVolumeClaim:
+          claimName: training-data-pvc
+      - name: model-checkpoints
+        persistentVolumeClaim:
+          claimName: model-checkpoints-pvc
+
+---
+# Advanced Comparative Studies Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: comparative-studies
+  namespace: protein-research-global
+  labels:
+    component: comparative-studies
+    tier: research-analysis
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app: comparative-studies
+  template:
+    metadata:
+      labels:
+        app: comparative-studies
+    spec:
+      containers:
+      - name: studies-engine
+        image: protein-operators:latest
+        command: ["python", "-m", "protein_operators.benchmarks.advanced_comparative_studies"]
+        env:
+        - name: STATISTICAL_FRAMEWORK
+          value: "advanced"
+        - name: BOOTSTRAP_SAMPLES
+          value: "10000"
+        - name: REPRODUCIBILITY_RUNS
+          value: "10"
+        - name: SIGNIFICANCE_LEVEL
+          value: "0.01"
+        - name: EFFECT_SIZE_THRESHOLD
+          value: "0.3"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: research-db-secret
+              key: url
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+        volumeMounts:
+        - name: benchmark-results
+          mountPath: /results
+      volumes:
+      - name: benchmark-results
+        persistentVolumeClaim:
+          claimName: benchmark-results-pvc
+
+---
+# Global Research Coordination Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: research-coordinator
+  namespace: protein-research-global
+  labels:
+    component: research-coordinator
+    tier: orchestration
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: research-coordinator
+  template:
+    metadata:
+      labels:
+        app: research-coordinator
+    spec:
+      containers:
+      - name: coordinator
+        image: protein-operators:latest
+        command: ["python", "-m", "protein_operators.infrastructure.distributed_coordinator"]
+        env:
+        - name: COORDINATION_MODE
+          value: "global"
+        - name: REGIONS
+          value: "us-central,eu-west,asia-east,us-west"
+        - name: EXPERIMENT_QUEUE
+          value: "redis://redis-cluster:6379"
+        - name: RESULT_AGGREGATION
+          value: "enabled"
+        - name: LOAD_BALANCING
+          value: "intelligent"
+        ports:
+        - containerPort: 9000
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# Redis Cluster for Coordination
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-cluster
+  namespace: protein-research-global
+spec:
+  serviceName: redis-cluster-service
+  replicas: 6
+  selector:
+    matchLabels:
+      app: redis-cluster
+  template:
+    metadata:
+      labels:
+        app: redis-cluster
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        - --cluster-enabled
+        - "yes"
+        - --cluster-config-file
+        - nodes.conf
+        - --cluster-node-timeout
+        - "5000"
+        - --appendonly
+        - "yes"
+        ports:
+        - containerPort: 6379
+        - containerPort: 16379
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        - name: redis-config
+          mountPath: /etc/redis
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: redis-config
+        configMap:
+          name: redis-config
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# High-Performance Computing (HPC) Job Scheduler
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hpc-scheduler
+  namespace: protein-research-global
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: hpc-scheduler
+            image: protein-operators:latest
+            command:
+            - python
+            - -m
+            - protein_operators.utils.high_performance_computing
+            env:
+            - name: HPC_MODE
+              value: "scheduler"
+            - name: RESOURCE_ALLOCATION
+              value: "dynamic"
+            - name: PRIORITY_QUEUE
+              value: "research-priority"
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+          restartPolicy: OnFailure
+
+---
+# Global Load Balancer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: global-research-service
+  namespace: protein-research-global
+  annotations:
+    cloud.google.com/global-load-balancer: "true"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: quantum-api
+    port: 8080
+    targetPort: 8080
+  - name: training-api
+    port: 23456
+    targetPort: 23456
+  - name: studies-api
+    port: 8000
+    targetPort: 8000
+  - name: coordinator-api
+    port: 9000
+    targetPort: 9000
+  selector:
+    tier: research-compute
+
+---
+# Horizontal Pod Autoscaler for Research Workloads
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: research-hpa
+  namespace: protein-research-global
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: comparative-studies
+  minReplicas: 6
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: research_queue_length
+      target:
+        type: AverageValue
+        averageValue: "10"
+
+---
+# Network Policy for Research Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: research-network-policy
+  namespace: protein-research-global
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          purpose: research
+    - podSelector:
+        matchLabels:
+          tier: research-compute
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          purpose: research
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# Resource Quota for Research Namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: research-quota
+  namespace: protein-research-global
+spec:
+  hard:
+    requests.cpu: "100"
+    requests.memory: 200Gi
+    requests.nvidia.com/gpu: "32"
+    limits.cpu: "200"
+    limits.memory: 400Gi
+    limits.nvidia.com/gpu: "32"
+    persistentvolumeclaims: "20"
+    services: "10"
+    services.loadbalancers: "2"
+
+---
+# Priority Class for Research Workloads
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: research-priority
+value: 1000
+globalDefault: false
+description: "Priority class for research workloads"
+
+---
+# Storage Classes for Different Research Data Types
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: research-fast-ssd
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: research-bulk-storage
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-standard
+  replication-type: regional-pd
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+
+---
+# Persistent Volume Claims for Research Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quantum-state-pvc
+  namespace: protein-research-global
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: research-fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: training-data-pvc
+  namespace: protein-research-global
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi
+  storageClassName: research-bulk-storage
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-checkpoints-pvc
+  namespace: protein-research-global
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: research-fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: benchmark-results-pvc
+  namespace: protein-research-global
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: research-fast-ssd
