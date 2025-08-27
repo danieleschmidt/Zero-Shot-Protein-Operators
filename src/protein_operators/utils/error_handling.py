@@ -484,12 +484,13 @@ def is_valid_coordinates(value: Any) -> bool:
     """Check if value is valid protein coordinates."""
     try:
         import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
-try:
-    import torch
-except ImportError:
-    import mock_torch as torch
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+        try:
+            import torch
+        except ImportError:
+            import mock_torch as torch
+        
         if isinstance(value, torch.Tensor):
             return value.dim() == 2 and value.shape[1] == 3 and not torch.isnan(value).any()
         elif isinstance(value, (list, tuple)):

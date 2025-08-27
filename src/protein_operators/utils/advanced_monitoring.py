@@ -26,12 +26,16 @@ from enum import Enum
 from collections import defaultdict, deque
 import json
 from pathlib import Path
-import psutil
+try:
+    import psutil
+except ImportError:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+    import mock_psutil as psutil
 import queue
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 
-from .advanced_logger import AdvancedLogger
+from .advanced_logger import ProteinOperatorsLogger
 
 
 class MetricType(Enum):
@@ -297,7 +301,7 @@ class AlertManager:
         self.alert_rules = {}
         self.alert_handlers = []
         self.lock = threading.Lock()
-        self.logger = AdvancedLogger(__name__)
+        self.logger = ProteinOperatorsLogger(__name__)
     
     def add_alert_rule(
         self,
@@ -399,7 +403,7 @@ class AdvancedMonitoringSystem:
         enable_health_checks: bool = True,
         metrics_retention_hours: float = 24.0
     ):
-        self.logger = AdvancedLogger(__name__)
+        self.logger = ProteinOperatorsLogger(__name__)
         
         # Initialize components
         self.profiler = PerformanceProfiler()

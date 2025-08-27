@@ -10,11 +10,15 @@ from .reproducibility import (
     ExperimentConfig,
     ResultsArchiver
 )
-from .paper_experiments import (
-    PaperExperimentRunner,
-    FigureGenerator,
-    TableGenerator
-)
+try:
+    from .paper_experiments import (
+        PaperExperimentRunner,
+        FigureGenerator,
+        TableGenerator
+    )
+    _PAPER_EXPERIMENTS_AVAILABLE = True
+except ImportError:
+    _PAPER_EXPERIMENTS_AVAILABLE = False
 from .theoretical_analysis import (
     TheoreticalAnalyzer,
     ApproximationBounds,
@@ -25,10 +29,10 @@ __all__ = [
     'ReproducibilityManager',
     'ExperimentConfig',
     'ResultsArchiver',
-    'PaperExperimentRunner',
-    'FigureGenerator',
-    'TableGenerator',
     'TheoreticalAnalyzer',
     'ApproximationBounds',
     'ComplexityAnalysis'
 ]
+
+if _PAPER_EXPERIMENTS_AVAILABLE:
+    __all__.extend(['PaperExperimentRunner', 'FigureGenerator', 'TableGenerator'])
