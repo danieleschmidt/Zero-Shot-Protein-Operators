@@ -504,14 +504,10 @@ class QualityGatesRunner:
         
         # Simple secret patterns
         secret_patterns = [
-            r'password\s*=\s*["\'][^"\'
-]*["\']',
-            r'api_key\s*=\s*["\'][^"\'
-]*["\']',
-            r'secret\s*=\s*["\'][^"\'
-]*["\']',
-            r'token\s*=\s*["\'][^"\'
-]*["\']',
+            r'password\s*=\s*["\'][^"\']*["\']',
+            r'api_key\s*=\s*["\'][^"\']*["\']',
+            r'secret\s*=\s*["\'][^"\']*["\']',
+            r'token\s*=\s*["\'][^"\']*["\']',
         ]
         
         try:
